@@ -59,6 +59,14 @@ uint64_t get_ticks(void)
 static void timer_handler(void)
 {
     ticks++;
+    struct ProcessControl *pc = get_pc();
+    struct Process *proc = pc->current_process;
+    if (proc->pid != 0) {
+        proc->runtime++;
+        proc->time_slice--;
+        if (proc->time_slice <= 0)
+            pc->need_resched = 1;
+    }
     wake_up(-1);
 }
 
@@ -161,7 +169,9 @@ void handler(struct TrapFrame *tf)
             }
     }
 
-    if (tf->trapno == 32 || tf->trapno == 40) {
+    struct ProcessControl *pc = get_pc();
+    if ((tf->trapno == 32 && pc->need_resched) || tf->trapno == 40) {
+        pc->need_resched = 0;
         yield();
     }
 }
