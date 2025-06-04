@@ -113,34 +113,82 @@ static bool split_path(char *path, char *name, char *ext)
     return true;
 }
 
-static uint32_t search_file(char *path)
+static bool search_in_directory(uint32_t dir_cluster, char *name, char *ext, struct DirEntry *res)
 {
-    char name[8] = {"        "};
-    char ext[3] =  {"   "};
-    uint32_t root_entry_count;
-    struct DirEntry *dir_entry; 
-
-    bool status = split_path(path, name, ext);
-
-    if (status == true) {
-        root_entry_count = get_root_directory_count();
-        dir_entry = get_root_directory();
-        
-        for (uint32_t i = 0; i < root_entry_count; i++) {
-            if (dir_entry[i].name[0] == ENTRY_EMPTY || dir_entry[i].name[0] == ENTRY_DELETED)
+    if (dir_cluster == 0) {
+        struct DirEntry *dir = get_root_directory();
+        uint32_t count = get_root_directory_count();
+        for (uint32_t i = 0; i < count; i++) {
+            if (dir[i].name[0] == ENTRY_EMPTY || dir[i].name[0] == ENTRY_DELETED)
                 continue;
-
-            if (dir_entry[i].attributes == 0xf) {
+            if (dir[i].attributes == 0xf)
                 continue;
+            if (is_file_name_equal(&dir[i], name, ext)) {
+                if (res)
+                    *res = dir[i];
+                return true;
             }
-
-            if (is_file_name_equal(&dir_entry[i], name, ext)) {
-                return i;
+        }
+    } else {
+        struct BPB* bpb = get_fs_bpb();
+        uint32_t cluster_size = get_cluster_size();
+        uint32_t cluster = dir_cluster;
+        while (cluster >= 2 && cluster < 0xfff7) {
+            struct DirEntry *dir = (struct DirEntry*)((uint64_t)bpb + get_cluster_offset(cluster));
+            for (uint32_t i = 0; i < cluster_size / sizeof(struct DirEntry); i++) {
+                if (dir[i].name[0] == ENTRY_EMPTY)
+                    return false;
+                if (dir[i].name[0] == ENTRY_DELETED || dir[i].attributes == 0xf)
+                    continue;
+                if (is_file_name_equal(&dir[i], name, ext)) {
+                    if (res)
+                        *res = dir[i];
+                    return true;
+                }
             }
+            cluster = get_cluster_value(cluster);
         }
     }
 
-    return 0xffffffff;
+    return false;
+}
+
+static bool find_entry(char *path, struct DirEntry *res)
+{
+    char component[16];
+    uint32_t dir_cluster = 0;
+    char *p = path;
+
+    while (1) {
+        int len = 0;
+        while (p[len] != '\0' && p[len] != '/')
+            len++;
+        memcpy(component, p, len);
+        component[len] = '\0';
+        if (p[len] == '/')
+            p += len + 1;
+        else
+            p += len;
+
+        char name[8] = "        ";
+        char ext[3] = "   ";
+        if (!split_path(component, name, ext))
+            return false;
+
+        struct DirEntry entry;
+        if (!search_in_directory(dir_cluster, name, ext, &entry))
+            return false;
+
+        if (*p == '\0') {
+            if (res)
+                *res = entry;
+            return true;
+        }
+
+        if ((entry.attributes & 0x10) == 0)
+            return false;
+        dir_cluster = entry.cluster_index;
+    }
 }
 
 static uint32_t read_raw_data(uint32_t cluster_index, char *buffer, uint32_t size)
@@ -185,26 +233,14 @@ static uint32_t read_file(uint32_t cluster_index, void *buffer, uint32_t size)
 
 int load_file(char *path, uint64_t addr)
 {
-    uint32_t index;
-    uint32_t file_size;
-    uint32_t cluster_index;
-    struct DirEntry *dir_entry;
-    int ret = -1;
-    
-    index = search_file(path);
+    struct DirEntry entry;
+    if (!find_entry(path, &entry))
+        return -1;
 
-    if (index != 0xffffffff) {
-        
-        dir_entry = get_root_directory();
-        file_size = dir_entry[index].file_size;
-        cluster_index = dir_entry[index].cluster_index;
-        
-        if (read_file(cluster_index, (void*)addr, file_size) == file_size) {
-            ret = 0;
-        }
-    }
+    if (read_file(entry.cluster_index, (void*)addr, entry.file_size) == entry.file_size)
+        return 0;
 
-    return ret;
+    return -1;
 }
 
 void init_fs(void)

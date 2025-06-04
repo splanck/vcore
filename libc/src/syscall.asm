@@ -233,6 +233,10 @@ global socket
 global sendto
 global recvfrom
 global set_priority
+global mkdir
+global opendir
+global readdir
+global rmdir
 
 socket:
     sub rsp,8
@@ -271,6 +275,47 @@ recvfrom:
 set_priority:
     sub rsp,8
     mov eax,20
+    mov [rsp],rdi
+    mov rdi,1
+    mov rsi,rsp
+    int 0x80
+    add rsp,8
+    ret
+
+mkdir:
+    sub rsp,8
+    mov eax,21
+    mov [rsp],rdi
+    mov rdi,1
+    mov rsi,rsp
+    int 0x80
+    add rsp,8
+    ret
+
+opendir:
+    sub rsp,8
+    mov eax,22
+    mov [rsp],rdi
+    mov rdi,1
+    mov rsi,rsp
+    int 0x80
+    add rsp,8
+    ret
+
+readdir:
+    sub rsp,16
+    mov eax,23
+    mov [rsp],rdi
+    mov [rsp+8],rsi
+    mov rdi,2
+    mov rsi,rsp
+    int 0x80
+    add rsp,16
+    ret
+
+rmdir:
+    sub rsp,8
+    mov eax,24
     mov [rsp],rdi
     mov rdi,1
     mov rsi,rsp
