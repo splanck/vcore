@@ -1,9 +1,11 @@
 #include "e1000.h"
 #include "kernel/print.h"
 #include "kernel/keyboard.h" /* for in_byte */
+#include "kernel/memory.h"
+#include "kernel/trap.h" /* for read_cr3 */
 #include <string.h>
 
-/* Low level port I/O helpers.  Only what we need for the fake driver */
+/* Low level port I/O helpers.  Only what we need for the driver */
 static inline void out_byte(uint16_t port, uint8_t val)
 {
     __asm__ volatile("outb %0, %1" :: "a"(val), "d"(port));
@@ -23,15 +25,27 @@ static inline uint32_t pci_read32(uint32_t addr)
     return data;
 }
 
+static inline void pci_write32(uint32_t addr, uint32_t data)
+{
+    out_byte(0xCF8, addr & 0xFF);
+    out_byte(0xCF8 + 1, (addr >> 8) & 0xFF);
+    out_byte(0xCF8 + 2, (addr >> 16) & 0xFF);
+    out_byte(0xCF8 + 3, (addr >> 24) & 0xFF);
+    out_byte(0xCFC, data & 0xFF);
+    out_byte(0xCFC + 1, (data >> 8) & 0xFF);
+    out_byte(0xCFC + 2, (data >> 16) & 0xFF);
+    out_byte(0xCFC + 3, (data >> 24) & 0xFF);
+}
+
 /*
- * Very small software model of the Intel E1000 driver.  The
- * original code only implemented an in-memory loopback device.
- * For demonstration purposes we add a skeleton that looks a bit
- * more like a real driver: we pretend to perform PCI discovery,
- * MMIO mapping and descriptor ring setup.  Real hardware access
- * is not possible in the test environment so the driver still
- * falls back to the old loopback behaviour when actual device
- * registers are not present.
+ * Very small software model of the Intel E1000 driver.  The previous
+ * version only emulated an in-memory loopback device.  The code below
+ * extends this into a minimal real driver: it performs a PCI probe,
+ * maps the device BAR, sets up descriptor rings and uses the hardware
+ * DMA engine for transmit and receive whenever a device is present.
+ * When no hardware is detected the old loopback logic is used so that
+ * the rest of the stack keeps working in QEMU or on systems without an
+ * E1000 NIC.
  */
 
 #define QUEUE 16
@@ -80,8 +94,11 @@ void e1000_init(void)
         uint32_t addr = (1u << 31) | (0 << 16) | (dev << 11) | (0 << 8);
         uint32_t id = pci_read32(addr);
         if (id == 0x100E8086) {
-            uint32_t bar = pci_read32(addr | 0x10);
-            e1000_regs = (volatile uint32_t*)(bar & ~0xf);
+            uint32_t bar0 = pci_read32(addr | 0x10);
+            uint64_t mmio = bar0 & ~0xf;
+            uint64_t kmap = P2V(read_cr3());
+            map_pages(kmap, P2V(mmio), P2V(mmio + PAGE_SIZE), mmio, PTE_P|PTE_W);
+            e1000_regs = (volatile uint32_t*)P2V(mmio);
             break;
         }
     }
@@ -90,8 +107,29 @@ void e1000_init(void)
         printk("e1000: found at %p\n", (void*)e1000_regs);
         memset(tx_desc, 0, sizeof(tx_desc));
         memset(rx_desc, 0, sizeof(rx_desc));
-        for (int i = 0; i < QUEUE; i++)
+
+        for (int i = 0; i < QUEUE; i++) {
+            tx_desc[i].status = 0;
+            rx_desc[i].status = 0;
             rx_desc[i].addr = (uint64_t)rx_buf[i];
+        }
+
+        e1000_regs[E1000_TDBAL/4] = V2P(tx_desc);
+        e1000_regs[E1000_TDBAH/4] = 0;
+        e1000_regs[E1000_TDLEN/4] = sizeof(tx_desc);
+        e1000_regs[E1000_TDH/4] = 0;
+        e1000_regs[E1000_TDT/4] = 0;
+
+        e1000_regs[E1000_RDBAL/4] = V2P(rx_desc);
+        e1000_regs[E1000_RDBAH/4] = 0;
+        e1000_regs[E1000_RDLEN/4] = sizeof(rx_desc);
+        e1000_regs[E1000_RDH/4] = 0;
+        e1000_regs[E1000_RDT/4] = QUEUE - 1;
+
+        e1000_regs[E1000_TCTL/4] = (1<<1) | (1<<3) | (0x40<<12);
+        e1000_regs[E1000_TIPG/4] = 10 | (8<<10) | (12<<20);
+        e1000_regs[E1000_RCTL/4] = (1<<1) | (1<<15);
+        e1000_regs[E1000_IMS/4] = 0x1F6DC;
     } else {
         printk("e1000: no device found, using loopback only\n");
     }
@@ -100,7 +138,8 @@ void e1000_init(void)
     rx_head = rx_tail = 0;
 }
 
-/* Send packet and also loop it back to the receive queue */
+/* Send a packet using the descriptor ring.  When no hardware is
+ * available packets are looped back into the receive queue. */
 int e1000_send(const uint8_t *data, uint16_t len)
 {
     if (len > PKT_SIZE)
@@ -110,33 +149,42 @@ int e1000_send(const uint8_t *data, uint16_t len)
     tx_len[tx_tail] = len;
 
     if (e1000_regs) {
-        tx_desc[tx_tail].addr = (uint64_t)tx_buf[tx_tail];
+        tx_desc[tx_tail].addr = V2P(tx_buf[tx_tail]);
         tx_desc[tx_tail].length = len;
         tx_desc[tx_tail].cmd = 0x9; /* RS | EOP */
-        /* In a real driver we would update TDT and wait for hardware */
+        tx_desc[tx_tail].status = 0;
+        e1000_regs[E1000_TDT/4] = tx_tail;
+        while (!(tx_desc[tx_tail].status & 0x1))
+            ;
+    } else {
+        /* Loopback for builds without real hardware */
+        memcpy(rx_buf[rx_tail], data, len);
+        rx_len[rx_tail] = len;
+        rx_tail = (rx_tail + 1) % QUEUE;
     }
 
     tx_tail = (tx_tail + 1) % QUEUE;
-
-    /* Without actual hardware we simply loop the packet back */
-    memcpy(rx_buf[rx_tail], data, len);
-    rx_len[rx_tail] = len;
-    rx_tail = (rx_tail + 1) % QUEUE;
     return len;
 }
 
 int e1000_receive(uint8_t *buf, uint16_t buf_len)
 {
+    if (e1000_regs) {
+        if (!(rx_desc[rx_head].status & 0x1))
+            return 0;
+
+        uint16_t len = rx_desc[rx_head].length;
+        if (len > buf_len)
+            len = buf_len;
+        memcpy(buf, (void*)(uintptr_t)P2V(rx_desc[rx_head].addr), len);
+        rx_desc[rx_head].status = 0;
+        e1000_regs[E1000_RDT/4] = rx_head;
+        rx_head = (rx_head + 1) % QUEUE;
+        return len;
+    }
+
     if (rx_head == rx_tail)
         return 0;
-
-    if (e1000_regs && (rx_desc[rx_head].status & 0x1)) {
-        rx_len[rx_head] = rx_desc[rx_head].length;
-        memcpy(rx_buf[rx_head], (void*)(uintptr_t)rx_desc[rx_head].addr,
-               rx_len[rx_head] > PKT_SIZE ? PKT_SIZE : rx_len[rx_head]);
-        rx_desc[rx_head].status = 0;
-        /* A real driver would return the buffer to hardware here. */
-    }
 
     uint16_t len = rx_len[rx_head];
     if (len > buf_len)
@@ -146,11 +194,13 @@ int e1000_receive(uint8_t *buf, uint16_t buf_len)
     return len;
 }
 
-/* Interrupt handler stub.  Real hardware would trigger this when new
- * packets are available or when transmission has completed.  In this
- * toy driver we simply poll the receive descriptors. */
+/* Interrupt handler used when the NIC raises an interrupt.  The kernel
+ * does not hook the device IRQ directly so the driver exposes this
+ * function which the generic timer or polling code may call.  It simply
+ * acknowledges pending events. */
 void e1000_interrupt(void)
 {
-    (void)e1000_regs;
-    /* Nothing to do – polling in e1000_receive() handles data */
+    if (!e1000_regs)
+        return;
+    (void)e1000_regs[E1000_ICR/4];
 }

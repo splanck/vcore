@@ -27,6 +27,9 @@ static void net_poll(void)
     int n;
     struct eth_header { uint8_t dst[6]; uint8_t src[6]; uint16_t type; } __attribute__((packed));
 
+    /* acknowledge any pending interrupts and fetch newly received frames */
+    e1000_interrupt();
+
     while ((n = e1000_receive(pkt, sizeof(pkt))) > 0) {
         if (n < sizeof(struct eth_header))
             continue;
