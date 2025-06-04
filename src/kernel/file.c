@@ -116,34 +116,103 @@ static bool split_path(char *path, char *name, char *ext)
     return true;
 }
 
-static uint32_t search_file(char *path)
+static bool search_in_directory(uint32_t dir_cluster, char *name, char *ext, struct DirEntry *res, uint32_t *idx)
 {
-    char name[8] = {"        "};
-    char ext[3] =  {"   "};
-    uint32_t root_entry_count;
-    struct DirEntry *dir_entry; 
-
-    bool status = split_path(path, name, ext);
-
-    if (status == true) {
-        root_entry_count = get_root_directory_count();
-        dir_entry = get_root_directory();
-        
-        for (uint32_t i = 0; i < root_entry_count; i++) {
-            if (dir_entry[i].name[0] == ENTRY_EMPTY || dir_entry[i].name[0] == ENTRY_DELETED)
+    if (dir_cluster == 0) {
+        struct DirEntry *dir = get_root_directory();
+        uint32_t count = get_root_directory_count();
+        for (uint32_t i = 0; i < count; i++) {
+            if (dir[i].name[0] == ENTRY_EMPTY || dir[i].name[0] == ENTRY_DELETED)
                 continue;
-
-            if (dir_entry[i].attributes == 0xf) {
+            if (dir[i].attributes == 0xf)
                 continue;
+            if (is_file_name_equal(&dir[i], name, ext)) {
+                if (res)
+                    *res = dir[i];
+                if (idx)
+                    *idx = i;
+                return true;
             }
-
-            if (is_file_name_equal(&dir_entry[i], name, ext)) {
-                return i;
+        }
+    } else {
+        struct BPB* bpb = get_fs_bpb();
+        uint32_t cluster_size = get_cluster_size();
+        uint32_t cluster = dir_cluster;
+        uint32_t index = 0;
+        while (cluster >= 2 && cluster < 0xfff7) {
+            struct DirEntry *dir = (struct DirEntry*)((uint64_t)bpb + get_cluster_offset(cluster));
+            for (uint32_t i = 0; i < cluster_size / sizeof(struct DirEntry); i++, index++) {
+                if (dir[i].name[0] == ENTRY_EMPTY)
+                    return false;
+                if (dir[i].name[0] == ENTRY_DELETED || dir[i].attributes == 0xf)
+                    continue;
+                if (is_file_name_equal(&dir[i], name, ext)) {
+                    if (res)
+                        *res = dir[i];
+                    if (idx)
+                        *idx = index;
+                    return true;
+                }
             }
+            cluster = get_cluster_value(cluster);
         }
     }
 
-    return 0xffffffff;
+    return false;
+}
+
+static bool find_entry(char *path, struct DirEntry *res, uint32_t *dir_cluster, uint32_t *dir_index)
+{
+    char component[16];
+    uint32_t cur = 0;
+    char *p = path;
+
+    while (1) {
+        int len = 0;
+        while (p[len] != '\0' && p[len] != '/')
+            len++;
+        memcpy(component, p, len);
+        component[len] = '\0';
+        if (p[len] == '/')
+            p += len + 1;
+        else
+            p += len;
+
+        char name[8] = "        ";
+        char ext[3] = "   ";
+        if (!split_path(component, name, ext))
+            return false;
+
+        struct DirEntry entry;
+        uint32_t idx;
+        if (!search_in_directory(cur, name, ext, &entry, &idx))
+            return false;
+
+        if (*p == '\0') {
+            if (res)
+                *res = entry;
+            if (dir_cluster)
+                *dir_cluster = cur;
+            if (dir_index)
+                *dir_index = idx;
+            return true;
+        }
+
+        if ((entry.attributes & 0x10) == 0)
+            return false;
+        cur = entry.cluster_index;
+    }
+}
+
+static uint32_t search_file(char *path)
+{
+    struct DirEntry e;
+    uint32_t dirc, idx;
+    if (!find_entry(path, &e, &dirc, &idx))
+        return 0xffffffff;
+    if (dirc != 0)
+        return 0xffffffff;
+    return idx;
 }
 
 static uint32_t get_fcb(uint32_t index)
@@ -168,15 +237,17 @@ static void put_fcb(struct FCB *fcb)
 {
     ASSERT(fcb->count > 0);
     fcb->count--;
+    if (fcb->count == 0)
+        memset(fcb, 0, sizeof(struct FCB));
 }
 
 int open_file(struct Process *proc, char *path_name)
 {
     int fd = -1;
     int file_desc_index = -1;
-    uint32_t entry_index;
-    uint32_t fcb_index;
-    
+    struct DirEntry entry;
+    uint32_t dir_cluster;
+
     for (int i = 0; i < 100; i++) {
         if (proc->file[i] == NULL) {
             fd = i;
@@ -195,22 +266,38 @@ int open_file(struct Process *proc, char *path_name)
         }
     }
 
-    if (file_desc_index == -1) {
+    if (file_desc_index == -1)
         return -1;
-    }
 
-    entry_index = search_file(path_name);
-    if (entry_index == 0xffffffff) {
+    if (!find_entry(path_name, &entry, &dir_cluster, NULL))
         return -1;
+    if ((entry.attributes & 0x10) != 0)
+        return -1;
+
+    struct FCB *fcb = NULL;
+    for (uint32_t i = 0; i < PAGE_SIZE / sizeof(struct FCB); i++) {
+        if (fcb_table[i].count == 0) {
+            fcb = &fcb_table[i];
+            break;
+        }
     }
-    
-    fcb_index = get_fcb(entry_index);
-    
+    if (fcb == NULL)
+        return -1;
+
+    memset(fcb, 0, sizeof(struct FCB));
+    memcpy(fcb->name, entry.name, 8);
+    memcpy(fcb->ext, entry.ext, 3);
+    fcb->cluster_index = entry.cluster_index;
+    fcb->file_size = entry.file_size;
+    fcb->count = 1;
+    fcb->attributes = entry.attributes;
+    fcb->dir_index = 0;
+
     memset(&file_desc_table[file_desc_index], 0, sizeof(struct FileDesc));
-    file_desc_table[file_desc_index].fcb = &fcb_table[fcb_index];
+    file_desc_table[file_desc_index].fcb = fcb;
     file_desc_table[file_desc_index].count = 1;
     proc->file[fd] = &file_desc_table[file_desc_index];
-    
+
     return fd;
 }
 
@@ -474,6 +561,131 @@ int delete_file(char *path)
     release_chain(dir[index].cluster_index);
     dir[index].name[0] = ENTRY_DELETED;
 
+    return 0;
+}
+
+int mkdir(char *path)
+{
+    char name[8] = "        ";
+    char ext[3] = "   ";
+    struct DirEntry *dir = get_root_directory();
+    uint32_t count = get_root_directory_count();
+
+    if (!split_path(path, name, ext))
+        return -1;
+
+    for (uint32_t i = 0; i < count; i++) {
+        if (dir[i].name[0] != ENTRY_EMPTY && dir[i].name[0] != ENTRY_DELETED)
+            if (is_file_name_equal(&dir[i], name, ext))
+                return -1;
+    }
+
+    uint32_t free_index = 0xffffffff;
+    for (uint32_t i = 0; i < count; i++) {
+        if (dir[i].name[0] == ENTRY_EMPTY || dir[i].name[0] == ENTRY_DELETED) {
+            free_index = i;
+            break;
+        }
+    }
+
+    if (free_index == 0xffffffff)
+        return -1;
+
+    uint32_t cluster = allocate_cluster(0);
+    if (cluster == 0)
+        return -1;
+
+    memset(&dir[free_index], 0, sizeof(struct DirEntry));
+    memcpy(dir[free_index].name, name, 8);
+    memcpy(dir[free_index].ext, ext, 3);
+    dir[free_index].cluster_index = cluster;
+    dir[free_index].file_size = 0;
+    dir[free_index].attributes = 0x10;
+
+    return 0;
+}
+
+int opendir(struct Process *proc, char *path)
+{
+    int fd = -1;
+    int file_desc_index = -1;
+    struct DirEntry entry;
+    uint32_t dir_cluster;
+
+    for (int i = 0; i < 100; i++) {
+        if (proc->file[i] == NULL) { fd = i; break; }
+    }
+    if (fd == -1)
+        return -1;
+
+    for (int i = 0; i < PAGE_SIZE / sizeof(struct FileDesc); i++) {
+        if (file_desc_table[i].fcb == NULL) { file_desc_index = i; break; }
+    }
+    if (file_desc_index == -1)
+        return -1;
+
+    if (!find_entry(path, &entry, &dir_cluster, NULL))
+        return -1;
+    if ((entry.attributes & 0x10) == 0)
+        return -1;
+
+    struct FCB *fcb = NULL;
+    for (uint32_t i = 0; i < PAGE_SIZE / sizeof(struct FCB); i++) {
+        if (fcb_table[i].count == 0) { fcb = &fcb_table[i]; break; }
+    }
+    if (!fcb) return -1;
+    memset(fcb,0,sizeof(struct FCB));
+    memcpy(fcb->name, entry.name,8);
+    memcpy(fcb->ext, entry.ext,3);
+    fcb->cluster_index = entry.cluster_index;
+    fcb->file_size = entry.file_size;
+    fcb->attributes = entry.attributes;
+    fcb->count = 1;
+
+    memset(&file_desc_table[file_desc_index],0,sizeof(struct FileDesc));
+    file_desc_table[file_desc_index].fcb = fcb;
+    file_desc_table[file_desc_index].count = 1;
+    proc->file[fd] = &file_desc_table[file_desc_index];
+
+    return fd;
+}
+
+int readdir(struct Process *proc, int fd, struct DirEntry *entry)
+{
+    struct FileDesc *desc = proc->file[fd];
+    if (!desc || (desc->fcb->attributes & 0x10) == 0)
+        return -1;
+
+    if (desc->fcb->cluster_index < 2) {
+        uint32_t count = get_root_directory_count();
+        uint32_t idx = desc->position / sizeof(struct DirEntry);
+        if (idx >= count)
+            return 0;
+        struct DirEntry *dir = get_root_directory();
+        *entry = dir[idx];
+        desc->position += sizeof(struct DirEntry);
+        return 1;
+    } else {
+        if (read_raw_data(desc->fcb->cluster_index, (char*)entry, desc->position, sizeof(struct DirEntry)) != sizeof(struct DirEntry))
+            return 0;
+        desc->position += sizeof(struct DirEntry);
+        if (entry->name[0] == ENTRY_EMPTY)
+            return 0;
+        return 1;
+    }
+}
+
+int rmdir(char *path)
+{
+    uint32_t index = search_file(path);
+    if (index == 0xffffffff)
+        return -1;
+
+    struct DirEntry *dir = get_root_directory();
+    if ((dir[index].attributes & 0x10) == 0)
+        return -1;
+    release_chain(dir[index].cluster_index);
+    dir[index].name[0] = ENTRY_DELETED;
     return 0;
 }
 

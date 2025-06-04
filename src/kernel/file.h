@@ -45,6 +45,7 @@ struct DirEntry {
 struct FCB {
     char name[8];
     char ext[3];
+    uint8_t attributes;
     uint32_t cluster_index;
     uint32_t dir_index;
     uint32_t file_size;
@@ -73,5 +74,9 @@ int read_root_directory(char *buffer);
 int create_file(char *name);
 int write_file(struct Process *proc, int fd, void *buffer, uint32_t size);
 int delete_file(char *name);
+int mkdir(char *path);
+int opendir(struct Process *proc, char *path);
+int readdir(struct Process *proc, int fd, struct DirEntry *entry);
+int rmdir(char *path);
 
 #endif

@@ -8,7 +8,7 @@
 #include "file.h"
 #include "net/socket.h"
 
-static SYSTEMCALL system_calls[21];
+static SYSTEMCALL system_calls[25];
 
 static int sys_sbrk(int64_t *argptr)
 {
@@ -126,6 +126,28 @@ static int sys_delete_file(int64_t *argptr)
     return delete_file((char*)argptr[0]);
 }
 
+static int sys_mkdir(int64_t *argptr)
+{
+    return mkdir((char*)argptr[0]);
+}
+
+static int sys_opendir(int64_t *argptr)
+{
+    struct ProcessControl *pc = get_pc();
+    return opendir(pc->current_process, (char*)argptr[0]);
+}
+
+static int sys_readdir(int64_t *argptr)
+{
+    struct ProcessControl *pc = get_pc();
+    return readdir(pc->current_process, argptr[0], (struct DirEntry*)argptr[1]);
+}
+
+static int sys_rmdir(int64_t *argptr)
+{
+    return rmdir((char*)argptr[0]);
+}
+
 static int sys_set_priority(int64_t *argptr)
 {
     struct ProcessControl *pc = get_pc();
@@ -171,6 +193,10 @@ void init_system_call(void)
     system_calls[18] = sys_sendto;
     system_calls[19] = sys_recvfrom;
     system_calls[20] = sys_set_priority;
+    system_calls[21] = sys_mkdir;
+    system_calls[22] = sys_opendir;
+    system_calls[23] = sys_readdir;
+    system_calls[24] = sys_rmdir;
 }
 
 void system_call(struct TrapFrame *tf)
@@ -179,7 +205,7 @@ void system_call(struct TrapFrame *tf)
     int64_t param_count = tf->rdi;
     int64_t *argptr = (int64_t*)tf->rsi;
 
-    if (param_count < 0 || i > 20 || i < 0) {
+    if (param_count < 0 || i > 24 || i < 0) {
         tf->rax = -1;
         return;
     }
