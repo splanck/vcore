@@ -3,6 +3,8 @@
 #include "memory.h"
 #include "process.h"
 #include "syscall.h"
+#include "cpu.h"
+#include "arch/x86/smp.h"
 #include "file.h"
 #include "drivers/net/e1000.h"
 
@@ -14,6 +16,7 @@ void KMain(void)
    uint64_t size = (uint64_t)&bss_end - (uint64_t)&bss_start;
    memset(&bss_start, 0, size);
    
+   cpu_init();
    init_idt();
    init_memory();
    init_kheap();
@@ -22,4 +25,5 @@ void KMain(void)
    init_system_call();
    init_fs();
    init_process();
+   start_aps();
 }

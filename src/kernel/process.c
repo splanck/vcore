@@ -4,11 +4,11 @@
 #include "print.h"
 #include "lib.h"
 #include "debug.h"
+#include "cpu.h"
 
 extern struct TSS Tss;
 static struct Process process_table[NUM_PROC];
 static int pid_num = 1;
-static struct ProcessControl pc;
 
 static void set_tss(struct Process *proc)
 {
@@ -42,7 +42,7 @@ static struct Process* alloc_new_process(void)
     proc->state = PROC_INIT;
     proc->pid = pid_num++;
     proc->priority = 1;
-    proc->cpu_id = 0;
+    proc->cpu_id = cpu_current()->id;
 
     proc->stack = (uint64_t)kalloc();
     if (proc->stack == 0) {
@@ -75,7 +75,8 @@ static struct Process* alloc_new_process(void)
 
 struct ProcessControl* get_pc(void)
 {
-    return &pc;
+    struct CPU *cpu = cpu_current();
+    return &cpu->pc;
 }
 
 static void init_idle_process(void)
@@ -148,6 +149,7 @@ static void schedule(void)
     process_control = get_pc();
     prev_proc = process_control->current_process;
     current_proc = NULL;
+
     for (int pr = 0; pr < MAX_PRIORITY; pr++) {
         list = &process_control->ready_list[pr];
         if (!is_list_empty(list)) {
@@ -155,15 +157,33 @@ static void schedule(void)
             break;
         }
     }
+
+    /* simple load balancing: steal from other CPUs if idle */
+    if (current_proc == NULL) {
+        for (int cpu = 0; cpu < cpu_count && current_proc == NULL; cpu++) {
+            struct ProcessControl *other = &cpus[cpu].pc;
+            if (other == process_control)
+                continue;
+            for (int pr = 0; pr < MAX_PRIORITY; pr++) {
+                list = &other->ready_list[pr];
+                if (!is_list_empty(list)) {
+                    current_proc = (struct Process*)remove_list_head(list);
+                    break;
+                }
+            }
+        }
+    }
+
     if (current_proc == NULL) {
         ASSERT(process_control->current_process->pid != 0);
         current_proc = &process_table[0];
     }
-    
-    current_proc->state = PROC_RUNNING;   
+
+    current_proc->state = PROC_RUNNING;
+    current_proc->cpu_id = cpu_current()->id;
     process_control->current_process = current_proc;
 
-    switch_process(prev_proc, current_proc);   
+    switch_process(prev_proc, current_proc);
 }
 
 void yield(void)
@@ -171,18 +191,8 @@ void yield(void)
     struct ProcessControl *process_control;
     struct Process *process;
     struct HeadList *list;
-    
-    process_control = get_pc();
-    bool empty = true;
-    for (int pr = 0; pr < MAX_PRIORITY; pr++) {
-        if (!is_list_empty(&process_control->ready_list[pr])) {
-            empty = false;
-            break;
-        }
-    }
-    if (empty)
-        return;
 
+    process_control = get_pc();
     process = process_control->current_process;
     process->state = PROC_READY;
 
@@ -316,6 +326,7 @@ int fork(void)
     process->tf->rax = 0;
     process->brk = current_process->brk;
     process->priority = current_process->priority;
+    process->cpu_id = current_process->cpu_id;
     process->state = PROC_READY;
     list = &process_control->ready_list[process->priority];
     append_list_tail(list, (struct List*)process);
