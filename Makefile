@@ -3,30 +3,33 @@ NASM = nasm
 CC = $(CROSS)gcc
 LD = $(CROSS)ld
 OBJCOPY = $(CROSS)objcopy
+OBJDIR ?= build
 CFLAGS = -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c
 LDFLAGS = -nostdlib
+
+C_SRCS := $(wildcard src/kernel/*.c)
+ASM_SRCS := $(wildcard src/kernel/*.asm)
+C_OBJS := $(patsubst src/kernel/%.c,$(OBJDIR)/%.o,$(C_SRCS))
+ASM_OBJS := $(patsubst src/kernel/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
+KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
+
+$(OBJDIR):
+	mkdir -p $@
 
 .PHONY: all kernel bootloader users clean
 
 all: kernel bootloader users
 
 # Kernel build
-kernel:
-	nasm -f elf64 -o kernel.o src/kernel/kernel.asm
-	nasm -f elf64 -o trapa.o src/kernel/trap.asm
-	nasm -f elf64 -o liba.o src/kernel/lib.asm
-	$(CC) $(CFLAGS) src/kernel/main.c
-	$(CC) $(CFLAGS) src/kernel/trap.c
-	$(CC) $(CFLAGS) src/kernel/print.c
-	$(CC) $(CFLAGS) src/kernel/debug.c
-	$(CC) $(CFLAGS) src/kernel/memory.c
-	$(CC) $(CFLAGS) src/kernel/process.c
-	$(CC) $(CFLAGS) src/kernel/syscall.c
-	$(CC) $(CFLAGS) src/kernel/lib.c
-	$(CC) $(CFLAGS) src/kernel/keyboard.c
-	$(CC) $(CFLAGS) src/kernel/file.c
-	$(LD) $(LDFLAGS) -T link.lds -o kernel kernel.o main.o trapa.o trap.o liba.o print.o debug.o memory.o process.o syscall.o lib.o keyboard.o file.o
+kernel: $(OBJDIR) $(KERNEL_OBJS)
+	$(LD) $(LDFLAGS) -T link.lds -o $@ $(KERNEL_OBJS)
 	$(OBJCOPY) -O binary kernel kernel.bin
+
+$(OBJDIR)/%.o: src/kernel/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(OBJDIR)/%_asm.o: src/kernel/%.asm | $(OBJDIR)
+	$(NASM) -f elf64 -o $@ $<
 	
 # Bootloader build
 bootloader: os.img
@@ -87,7 +90,7 @@ user/user1/user.bin:
 $(OBJCOPY) -O binary user user.bin
 
 clean:
-	rm -f *.o kernel kernel.bin
-	rm -f boot/boot.bin boot/loader/*.o boot/loader/entry boot/loader/entry.bin boot/loader/loader.bin os.img
+	rm -rf $(OBJDIR) kernel kernel.bin
+		rm -f boot/boot.bin boot/loader/*.o boot/loader/entry boot/loader/entry.bin boot/loader/loader.bin os.img
 	rm -f user/*/*.o user/*/user user/*/*.bin
 
