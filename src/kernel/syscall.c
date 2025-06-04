@@ -6,6 +6,7 @@
 #include "debug.h"
 #include "stddef.h"
 #include "file.h"
+#include "net/socket.h"
 
 static SYSTEMCALL system_calls[20];
 
@@ -125,6 +126,21 @@ static int sys_delete_file(int64_t *argptr)
     return delete_file((char*)argptr[0]);
 }
 
+static int sys_socket(int64_t *argptr)
+{
+    return socket_create((int)argptr[0]);
+}
+
+static int sys_sendto(int64_t *argptr)
+{
+    return socket_send((int)argptr[0], (const void*)argptr[1], (int)argptr[2]);
+}
+
+static int sys_recvfrom(int64_t *argptr)
+{
+    return socket_recv((int)argptr[0], (void*)argptr[1], (int)argptr[2]);
+}
+
 void init_system_call(void)
 {
     system_calls[0] = sys_write;
@@ -144,6 +160,9 @@ void init_system_call(void)
     system_calls[14] = sys_create_file;
     system_calls[15] = sys_write_file;
     system_calls[16] = sys_delete_file;
+    system_calls[17] = sys_socket;
+    system_calls[18] = sys_sendto;
+    system_calls[19] = sys_recvfrom;
 }
 
 void system_call(struct TrapFrame *tf)
@@ -152,7 +171,7 @@ void system_call(struct TrapFrame *tf)
     int64_t param_count = tf->rdi;
     int64_t *argptr = (int64_t*)tf->rsi;
 
-    if (param_count < 0 || i > 16 || i < 0) {
+    if (param_count < 0 || i > 19 || i < 0) {
         tf->rax = -1;
         return;
     }

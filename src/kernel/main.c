@@ -4,6 +4,7 @@
 #include "process.h"
 #include "syscall.h"
 #include "file.h"
+#include "drivers/net/e1000.h"
 
 extern char bss_start;
 extern char bss_end;
@@ -17,6 +18,7 @@ void KMain(void)
    init_memory();
    init_kheap();
    init_kvm();
+   e1000_init();
    init_system_call();
    init_fs();
    init_process();
