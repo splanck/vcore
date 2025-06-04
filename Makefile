@@ -16,7 +16,7 @@ KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
 $(OBJDIR):
 	mkdir -p $@
 
-.PHONY: all kernel bootloader users clean
+.PHONY: all kernel bootloader users clean run
 
 all: kernel bootloader users
 
@@ -93,4 +93,7 @@ clean:
 	rm -rf $(OBJDIR) kernel kernel.bin
 		rm -f boot/boot.bin boot/loader/*.o boot/loader/entry boot/loader/entry.bin boot/loader/loader.bin os.img
 	rm -f user/*/*.o user/*/user user/*/*.bin
+
+run: os.img
+	qemu-system-x86_64 -drive format=raw,file=os.img
 
