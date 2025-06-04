@@ -18,6 +18,16 @@ Building requires `nasm`, a GCC cross‑compiler for x86_64 (set with the
 The Makefile uses tools like `$(CROSS)gcc`, `$(CROSS)ld`, and
 `$(CROSS)objcopy`.
 
+A helper script `scripts/build-toolchain.sh` can build a suitable
+cross‑compiler.  It downloads and compiles binutils and GCC into
+`$HOME/opt/cross` (or the directory specified by the `PREFIX` variable).
+After running the script, point `CROSS` at the resulting prefix.
+
+```bash
+./scripts/build-toolchain.sh
+CROSS=$HOME/opt/cross/bin/x86_64-elf- make
+```
+
 ## Building
 
 Run `make` at the repository root.  This compiles the kernel, bootloader
