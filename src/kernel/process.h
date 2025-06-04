@@ -40,6 +40,13 @@ struct TSS {
 	uint16_t iopb;
 } __attribute__((packed));
 
+struct SchedInfo {
+    int pid;
+    int priority;
+    uint64_t runtime;
+    int time_slice;
+};
+
 
 #define MAX_PRIORITY 4
 
@@ -73,5 +80,7 @@ void wait(int pid);
 int fork(void);
 int exec(struct Process *process, char *name);
 int grow_process(struct Process *process, int64_t inc);
+void boost_ready_processes(void);
+
 
 #endif

@@ -19,6 +19,13 @@ struct DirEntry {
     uint32_t file_size;
 } __attribute__((packed));
 
+struct SchedInfo {
+    int pid;
+    int priority;
+    unsigned long runtime;
+    int time_slice;
+};
+
 #define ENTRY_AVAILABLE 0
 #define ENTRY_DELETED 0xe5
 
@@ -48,5 +55,6 @@ int recvfrom(int sock, void *buf, uint32_t size);
 void set_priority(int prio);
 int get_priority(void);
 unsigned long get_runtime(void);
+int get_sched_info(struct SchedInfo *info);
 
 #endif

@@ -8,7 +8,7 @@
 #include "file.h"
 #include "net/socket.h"
 
-static SYSTEMCALL system_calls[27];
+static SYSTEMCALL system_calls[28];
 
 static int sys_sbrk(int64_t *argptr)
 {
@@ -167,6 +167,19 @@ static int sys_get_runtime(int64_t *argptr)
     return (int)pc->current_process->runtime;
 }
 
+static int sys_get_sched_info(int64_t *argptr)
+{
+    struct SchedInfo info;
+    struct ProcessControl *pc = get_pc();
+    struct Process *p = pc->current_process;
+    info.pid = p->pid;
+    info.priority = p->priority;
+    info.runtime = p->runtime;
+    info.time_slice = p->time_slice;
+    memcpy((void*)argptr[0], &info, sizeof(info));
+    return 0;
+}
+
 static int sys_socket(int64_t *argptr)
 {
     return socket_create((int)argptr[0]);
@@ -211,6 +224,7 @@ void init_system_call(void)
     system_calls[24] = sys_opendir;
     system_calls[25] = sys_readdir;
     system_calls[26] = sys_rmdir;
+    system_calls[27] = sys_get_sched_info;
 }
 
 void system_call(struct TrapFrame *tf)
@@ -219,7 +233,7 @@ void system_call(struct TrapFrame *tf)
     int64_t param_count = tf->rdi;
     int64_t *argptr = (int64_t*)tf->rsi;
 
-    if (param_count < 0 || i > 26 || i < 0) {
+    if (param_count < 0 || i > 27 || i < 0) {
         tf->rax = -1;
         return;
     }

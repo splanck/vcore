@@ -239,6 +239,7 @@ global mkdir
 global opendir
 global readdir
 global rmdir
+global get_sched_info
 
 socket:
     sub rsp,8
@@ -330,6 +331,16 @@ readdir:
 rmdir:
     sub rsp,8
     mov eax,26
+    mov [rsp],rdi
+    mov rdi,1
+    mov rsi,rsp
+    int 0x80
+    add rsp,8
+    ret
+
+get_sched_info:
+    sub rsp,8
+    mov eax,27
     mov [rsp],rdi
     mov rdi,1
     mov rsi,rsp

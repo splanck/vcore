@@ -139,6 +139,21 @@ void set_process_priority(struct Process *proc, int priority)
     proc->priority = priority;
 }
 
+void boost_ready_processes(void)
+{
+    struct ProcessControl *pc = get_pc();
+    struct HeadList *dest = &pc->ready_list[0];
+    for (int pr = 1; pr < MAX_PRIORITY; pr++) {
+        struct HeadList *list = &pc->ready_list[pr];
+        while (!is_list_empty(list)) {
+            struct Process *p = (struct Process*)remove_list_head(list);
+            p->priority = 0;
+            p->time_slice = time_slice_table[p->priority];
+            append_list_tail(dest, (struct List*)p);
+        }
+    }
+}
+
 static void switch_process(struct Process *prev, struct Process *current)
 {
     set_tss(current);

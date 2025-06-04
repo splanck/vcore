@@ -9,6 +9,8 @@
 static struct IdtPtr idt_pointer;
 static struct IdtEntry vectors[256];
 static uint64_t ticks;
+static uint64_t boost_counter;
+#define BOOST_INTERVAL 100
 
 static void init_idt_entry(struct IdtEntry *entry, uint64_t addr, uint8_t attribute)
 {
@@ -59,6 +61,7 @@ uint64_t get_ticks(void)
 static void timer_handler(void)
 {
     ticks++;
+    boost_counter++;
     struct ProcessControl *pc = get_pc();
     struct Process *proc = pc->current_process;
     if (proc->pid != 0) {
@@ -66,6 +69,10 @@ static void timer_handler(void)
         proc->time_slice--;
         if (proc->time_slice <= 0)
             pc->need_resched = 1;
+    }
+    if (boost_counter >= BOOST_INTERVAL) {
+        boost_counter = 0;
+        boost_ready_processes();
     }
     wake_up(-1);
 }
