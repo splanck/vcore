@@ -1,5 +1,7 @@
-#include "lib.h"
-#include "stdint.h"
+#include <stdio.h>
+#include <string.h>
+#include <lib.h>
+#include <stdint.h>
 
 static int read_cmd(char *buffer)
 {

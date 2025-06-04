@@ -3,6 +3,7 @@ NASM = nasm
 CC = $(CROSS)gcc
 LD = $(CROSS)ld
 OBJCOPY = $(CROSS)objcopy
+AR = $(CROSS)ar
 OBJDIR ?= build
 CFLAGS = -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c
 LDFLAGS = -nostdlib
@@ -13,12 +14,21 @@ C_OBJS := $(patsubst src/kernel/%.c,$(OBJDIR)/%.o,$(C_SRCS))
 ASM_OBJS := $(patsubst src/arch/x86/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
 KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
 
+LIBC_C_SRCS := $(wildcard libc/src/*.c)
+LIBC_ASM_SRCS := $(wildcard libc/src/*.asm)
+LIBC_C_OBJS := $(patsubst libc/src/%.c,$(OBJDIR)/libc_%.o,$(LIBC_C_SRCS))
+LIBC_ASM_OBJS := $(patsubst libc/src/%.asm,$(OBJDIR)/libc_%.o,$(LIBC_ASM_SRCS))
+LIBC_OBJS := $(LIBC_C_OBJS) $(LIBC_ASM_OBJS)
+LIBC_ARCHIVE := libc/libc.a
+
 $(OBJDIR):
 	mkdir -p $@
 
-.PHONY: all kernel bootloader users clean run
+.PHONY: all libc kernel bootloader users clean run
 
-all: kernel bootloader users
+all: libc kernel bootloader users
+
+libc: $(LIBC_ARCHIVE)
 
 # Kernel build
 kernel: $(OBJDIR) $(KERNEL_OBJS)
@@ -30,7 +40,14 @@ $(OBJDIR)/%.o: src/kernel/%.c | $(OBJDIR)
 
 $(OBJDIR)/%_asm.o: src/arch/x86/%.asm | $(OBJDIR)
 	$(NASM) -f elf64 -o $@ $<
-	
+
+$(OBJDIR)/libc_%.o: libc/src/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -I libc/include -o $@ $<
+$(OBJDIR)/libc_%.o: libc/src/%.asm | $(OBJDIR)
+	$(NASM) -f elf64 -o $@ $<
+
+$(LIBC_ARCHIVE): $(LIBC_OBJS)
+	$(AR) rcs $@ $^
 # Bootloader build
 bootloader: os.img
 
@@ -59,35 +76,34 @@ os.img: boot/boot.bin boot/loader/loader.bin
 	dd if=boot/loader/loader.bin of=$@ bs=512 count=15 seek=1 conv=notrunc
 
 # User programs
-users: user/ls/ls user/test/test.bin user/totalmem/totalmem user/user1/user.bin
+users: libc user/ls/ls user/test/test.bin user/totalmem/totalmem user/user1/user.bin
 
 user/ls/ls:
-				cd user/ls && \
-				$(NASM) -f elf64 -o start.o start.asm && \
-				$(CC) $(CFLAGS) -c main.c && \
-				$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o lib.a && \
-		$(OBJCOPY) -O binary user ls
+	cd user/ls && \
+	$(NASM) -f elf64 -o start.o start.asm && \
+	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
+	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
+	$(OBJCOPY) -O binary user ls
 	
 user/test/test.bin:
-		cd user/test && \
-		$(NASM) -f elf64 -o start.o start.asm && \
-		$(CC) $(CFLAGS) -c main.c && \
-		$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o lib.a && \
-$(OBJCOPY) -O binary user test.bin
+	cd user/test && \
+	$(NASM) -f elf64 -o start.o start.asm && \
+	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
+	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
+	$(OBJCOPY) -O binary user test.bin
 
 user/totalmem/totalmem:
-			cd user/totalmem && \
-			$(NASM) -f elf64 -o start.o start.asm && \
-			$(CC) $(CFLAGS) -c main.c && \
-			$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o lib.a && \
+	cd user/totalmem && \
+	$(NASM) -f elf64 -o start.o start.asm && \
+	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
+	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
 	$(OBJCOPY) -O binary user totalmem
-	
 user/user1/user.bin:
-		cd user/user1 && \
-		$(NASM) -f elf64 -o start.o start.asm && \
-		$(CC) $(CFLAGS) -c main.c && \
-		$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o lib.a && \
-$(OBJCOPY) -O binary user user.bin
+	cd user/user1 && \
+	$(NASM) -f elf64 -o start.o start.asm && \
+	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
+	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
+	$(OBJCOPY) -O binary user user.bin
 
 clean:
 	rm -rf $(OBJDIR) kernel kernel.bin
