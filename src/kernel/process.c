@@ -202,6 +202,7 @@ void yield(void)
     }
 
     schedule();
+    reschedule_other_cpus();
 }
 
 void sleep(int wait)
@@ -235,6 +236,7 @@ void wake_up(int wait)
         append_list_tail(ready_list, (struct List*)process);
         process = (struct Process*)remove_list(wait_list, wait);
     }
+    reschedule_other_cpus();
 }
 
 void exit(void)
@@ -253,6 +255,7 @@ void exit(void)
 
     wake_up(-3);
     schedule();
+    reschedule_other_cpus();
 }
 
 void wait(int pid)
@@ -330,6 +333,7 @@ int fork(void)
     process->state = PROC_READY;
     list = &process_control->ready_list[process->priority];
     append_list_tail(list, (struct List*)process);
+    reschedule_other_cpus();
 
     return process->pid;
 }

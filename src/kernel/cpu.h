@@ -15,5 +15,7 @@ extern int cpu_count;
 
 void cpu_init(void);
 struct CPU* cpu_current(void);
+void reschedule_other_cpus(void);
+void tlb_shootdown(void);
 
 #endif

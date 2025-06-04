@@ -65,6 +65,8 @@ void vector19(void);
 void vector32(void);
 void vector33(void);
 void vector39(void);
+void vector40(void);
+void vector41(void);
 void sysint(void);
 void init_idt(void);
 void eoi(void);

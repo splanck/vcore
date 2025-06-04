@@ -22,6 +22,8 @@ global vector19
 global vector32
 global vector33
 global vector39
+global vector40
+global vector41
 global sysint
 global eoi
 global read_isr
@@ -172,6 +174,16 @@ vector33:
 vector39:
     push 0
     push 39
+    jmp Trap
+
+vector40:
+    push 0
+    push 40
+    jmp Trap
+
+vector41:
+    push 0
+    push 41
     jmp Trap
 
 sysint:
