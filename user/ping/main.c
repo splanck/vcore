@@ -11,6 +11,7 @@ int main(void)
     }
 
     const char *msg = "ping";
+    /* transmit a small UDP packet to the host */
     sendto(sock, (void*)msg, strlen(msg));
     char buf[16] = {0};
     int n = recvfrom(sock, buf, sizeof(buf));
