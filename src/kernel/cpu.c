@@ -5,6 +5,7 @@
 
 struct CPU cpus[MAX_CPU];
 int cpu_count = 1;
+int cpu_online_count = 0;
 
 static int current_cpu_id = 0;
 
@@ -28,10 +29,19 @@ struct CPU* cpu_current(void)
     return &cpus[current_cpu_id];
 }
 
+void cpu_mark_online(int id)
+{
+    if (!cpus[id].online) {
+        cpus[id].online = 1;
+        cpu_online_count++;
+    }
+    current_cpu_id = id;
+}
+
 static void broadcast_ipi(unsigned char vec)
 {
     for (int i = 0; i < cpu_count; i++) {
-        if (i == current_cpu_id)
+        if (!cpus[i].online || i == current_cpu_id)
             continue;
         send_ipi(i, vec);
     }
@@ -53,4 +63,5 @@ void cpu_init(void)
     cpu_count = detect_cpus();
     for (int i = 0; i < cpu_count; i++)
         cpus[i].id = i;
+    cpu_mark_online(0);
 }

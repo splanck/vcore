@@ -169,6 +169,8 @@ static void schedule(void)
     /* simple load balancing: steal from other CPUs if idle */
     if (current_proc == NULL) {
         for (int cpu = 0; cpu < cpu_count && current_proc == NULL; cpu++) {
+            if (!cpus[cpu].online)
+                continue;
             struct ProcessControl *other = &cpus[cpu].pc;
             if (other == process_control)
                 continue;

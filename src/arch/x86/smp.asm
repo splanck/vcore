@@ -2,6 +2,7 @@ section .text
     global start_aps
     global send_ipi
     extern cpu_count
+    extern cpu_mark_online
 
 %define LAPIC_BASE 0xfee00000
 %define ICR_LOW   0x300
@@ -17,9 +18,13 @@ start_aps:
     mov edx, ecx
     shl edx, 24
     mov dword [LAPIC_BASE + ICR_HIGH], edx
-    mov dword [LAPIC_BASE + ICR_LOW], 0x000C4500
+    mov dword [LAPIC_BASE + ICR_LOW], 0x000C4500        ; INIT
     mov dword [LAPIC_BASE + ICR_HIGH], edx
-    mov dword [LAPIC_BASE + ICR_LOW], 0x000C4608
+    mov dword [LAPIC_BASE + ICR_LOW], 0x000C4608        ; SIPI
+    mov dword [LAPIC_BASE + ICR_HIGH], edx
+    mov dword [LAPIC_BASE + ICR_LOW], 0x000C4608        ; SIPI again
+    mov edi, ecx
+    call cpu_mark_online
     inc ecx
     cmp ecx, eax
     jl .loop
