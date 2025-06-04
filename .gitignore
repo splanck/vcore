@@ -50,3 +50,13 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+# vcore build outputs
+kernel
+kernel.bin
+boot/*.bin
+user/*/*.bin
+
+# Intermediate build files
+build/
+obj/
+
