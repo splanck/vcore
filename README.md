@@ -49,6 +49,13 @@ make run
 
 This executes `qemu-system-x86_64 -drive format=raw,file=os.img`.
 
+## Networking
+
+The kernel contains a very small driver for the Intel E1000 network
+card.  When run under QEMU with `-net nic,model=e1000 -net user` an
+example user program `ping` sends a UDP packet to the host and prints
+the reply.
+
 ## License
 
 This project is distributed under the terms of the GNU General Public
