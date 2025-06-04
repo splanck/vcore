@@ -4,6 +4,7 @@
 #include "process.h"
 #include "keyboard.h"
 #include "debug.h"
+#include "memory.h"
 
 static struct IdtPtr idt_pointer;
 static struct IdtEntry vectors[256];
@@ -59,6 +60,51 @@ static void timer_handler(void)
     wake_up(-1);
 }
 
+static int handle_page_fault(struct TrapFrame *tf)
+{
+    uint64_t addr = read_cr2();
+    struct ProcessControl *pc = get_pc();
+    struct Process *proc = pc->current_process;
+
+    if (addr >= proc->brk)
+        grow_process(proc, addr + PAGE_SIZE - proc->brk);
+
+    uint64_t va = PA_DOWN(addr);
+    PD pd = find_pdpt_entry(proc->page_map, va, 0, 0);
+    if (!pd)
+        return -1;
+    unsigned int idx = (va >> 21) & 0x1FF;
+
+    if (!(pd[idx] & PTE_P)) {
+        void *page = kalloc();
+        if (!page)
+            return -1;
+        memset(page, 0, PAGE_SIZE);
+        if (!map_pages(proc->page_map, va, va + PAGE_SIZE, V2P(page), PTE_P|PTE_W|PTE_U)) {
+            kfree((uint64_t)page);
+            return -1;
+        }
+        return 0;
+    }
+
+    if ((tf->errorcode & 2) && !(pd[idx] & PTE_W)) {
+        uint64_t pa = PTE_ADDR(pd[idx]);
+        if (page_getref(pa) > 1) {
+            void *page = kalloc();
+            if (!page)
+                return -1;
+            memcpy(page, (void*)P2V(pa), PAGE_SIZE);
+            page_decref(pa);
+            pd[idx] = (PDE)(V2P(page) | PTE_P|PTE_W|PTE_U|PTE_ENTRY);
+        } else {
+            pd[idx] |= PTE_W;
+        }
+        return 0;
+    }
+
+    return -1;
+}
+
 void handler(struct TrapFrame *tf)
 {
     unsigned char isr_value;
@@ -78,6 +124,15 @@ void handler(struct TrapFrame *tf)
             isr_value = read_isr();
             if ((isr_value&(1<<7)) != 0) {
                 eoi();
+            }
+            break;
+
+        case 14:
+            if (handle_page_fault(tf) < 0) {
+                if ((tf->cs & 3) == 3)
+                    exit();
+                else
+                    while (1) {}
             }
             break;
 

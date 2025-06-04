@@ -87,7 +87,7 @@ os.img: boot/boot.bin boot/loader/loader.bin
 	dd if=boot/loader/loader.bin of=$@ bs=512 count=15 seek=1 conv=notrunc
 
 # User programs
-users: libc user/ls/ls user/test/test.bin user/totalmem/totalmem user/user1/user.bin user/ping/ping
+users: libc user/ls/ls user/test/test.bin user/totalmem/totalmem user/user1/user.bin user/ping/ping user/cow/cow
 
 user/ls/ls:
 	cd user/ls && \
@@ -121,7 +121,14 @@ user/ping/ping:
 	$(NASM) -f elf64 -o start.o start.asm && \
 	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
 	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
-	$(OBJCOPY) -O binary user ping
+        $(OBJCOPY) -O binary user ping
+
+user/cow/cow:
+	cd user/cow && \
+	$(NASM) -f elf64 -o start.o start.asm && \
+	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
+	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
+	$(OBJCOPY) -O binary user cow
 
 clean:
 	rm -rf $(OBJDIR) kernel kernel.bin

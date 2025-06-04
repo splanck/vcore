@@ -6,12 +6,49 @@
 #include "stdbool.h"
 
 static void free_region(uint64_t v, uint64_t e);
+static uint16_t *page_refs;
 
 static struct FreeMemRegion free_mem_region[50];
 static struct Page free_memory;
 static uint64_t memory_end;
 static uint64_t total_mem;
 extern char end;
+
+#define PAGE_INDEX(pa) ((pa) / PAGE_SIZE)
+
+static void set_page_ref(uint64_t pa, uint16_t val)
+{
+    page_refs[PAGE_INDEX(pa)] = val;
+}
+
+static void inc_page_ref(uint64_t pa)
+{
+    page_refs[PAGE_INDEX(pa)]++;
+}
+
+static uint16_t get_page_ref(uint64_t pa)
+{
+    return page_refs[PAGE_INDEX(pa)];
+}
+
+void page_incref(uint64_t pa)
+{
+    inc_page_ref(pa);
+}
+
+void page_decref(uint64_t pa)
+{
+    uint16_t *ref = &page_refs[PAGE_INDEX(pa)];
+    if (*ref > 0)
+        (*ref)--;
+    if (*ref == 0)
+        kfree(P2V(pa));
+}
+
+uint16_t page_getref(uint64_t pa)
+{
+    return get_page_ref(pa);
+}
 
 void init_memory(void)
 {
@@ -43,7 +80,11 @@ void init_memory(void)
         }       
     }
     
-    memory_end = (uint64_t)free_memory.next + PAGE_SIZE;   
+    memory_end = (uint64_t)free_memory.next + PAGE_SIZE;
+
+    page_refs = kalloc();
+    if (page_refs)
+        memset(page_refs, 0, PAGE_SIZE);
 }
 
 uint64_t get_total_memory(void)
@@ -66,6 +107,9 @@ void kfree(uint64_t v)
     ASSERT(v >= (uint64_t) & end);
     ASSERT(v+PAGE_SIZE <= 0xffff800030000000);
 
+    uint64_t pa = V2P(v);
+    set_page_ref(pa, 0);
+
     struct Page *page_address = (struct Page*)v;
     page_address->next = free_memory.next;
     free_memory.next = page_address;
@@ -80,7 +124,8 @@ void* kalloc(void)
         ASSERT((uint64_t)page_address >= (uint64_t)&end);
         ASSERT((uint64_t)page_address+PAGE_SIZE <= 0xffff800030000000);
 
-        free_memory.next = page_address->next;            
+        free_memory.next = page_address->next;
+        set_page_ref(V2P(page_address), 1);
     }
     
     return page_address;
@@ -106,7 +151,7 @@ static PDPTR find_pml4t_entry(uint64_t map, uint64_t v, int alloc, uint32_t attr
     return pdptr;    
 }
 
-static PD find_pdpt_entry(uint64_t map, uint64_t v, int alloc, uint32_t attribute)
+PD find_pdpt_entry(uint64_t map, uint64_t v, int alloc, uint32_t attribute)
 {
     PDPTR pdptr = NULL;
     PD pd = NULL;
@@ -219,7 +264,7 @@ void free_pages(uint64_t map, uint64_t vstart, uint64_t vend)
         if (pd != NULL) {
             index = (vstart >> 21) & 0x1FF;
             if (pd[index] & PTE_P) {        
-                kfree(P2V(PTE_ADDR(pd[index])));
+                page_decref(PTE_ADDR(pd[index]));
                 pd[index] = 0;
             }
         }
@@ -238,7 +283,7 @@ static void free_pdt(uint64_t map)
             
             for (int j = 0; j < 512; j++) {
                 if ((uint64_t)pdptr[j] & PTE_P) {
-                    kfree(P2V(PDE_ADDR(pdptr[j])));
+                    page_decref(PDE_ADDR(pdptr[j]));
                     pdptr[j] = 0;
                 }
             }
@@ -251,8 +296,8 @@ static void free_pdpt(uint64_t map)
     PDPTR *map_entry = (PDPTR*)map;
 
     for (int i = 0; i < 512; i++) {
-        if ((uint64_t)map_entry[i] & PTE_P) {          
-            kfree(P2V(PDE_ADDR(map_entry[i])));
+        if ((uint64_t)map_entry[i] & PTE_P) {
+            page_decref(PDE_ADDR(map_entry[i]));
             map_entry[i] = 0;
         }
     }
@@ -260,7 +305,7 @@ static void free_pdpt(uint64_t map)
 
 static void free_pml4t(uint64_t map)
 {
-    kfree(map);
+    page_decref(V2P(map));
 }
 
 void free_vm(uint64_t map, uint64_t size)
@@ -302,6 +347,31 @@ bool copy_uvm(uint64_t dst_map, uint64_t src_map, int size)
             to_copy = PAGE_SIZE;
         memcpy(page, (void*)start, to_copy);
         copied += PAGE_SIZE;
+    }
+
+    return true;
+}
+
+bool share_uvm(uint64_t dst_map, uint64_t src_map, int size)
+{
+    for (int off = 0; off < size; off += PAGE_SIZE) {
+        PD pd = find_pdpt_entry(src_map, 0x400000 + off, 0, 0);
+        if (pd == NULL)
+            return false;
+
+        unsigned int idx = ((0x400000 + off) >> 21) & 0x1FF;
+        if (!(pd[idx] & PTE_P))
+            continue;
+
+        uint64_t pa = PTE_ADDR(pd[idx]);
+        pd[idx] &= ~PTE_W;
+
+        PD dstpd = find_pdpt_entry(dst_map, 0x400000 + off, 1, PTE_P|PTE_U);
+        if (!dstpd)
+            return false;
+        dstpd[idx] = (PDE)(pa | PTE_P | PTE_U | PTE_ENTRY);
+
+        page_incref(pa);
     }
 
     return true;
