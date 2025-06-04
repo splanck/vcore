@@ -307,8 +307,8 @@ int fork(void)
         return -1;
     }
 
-    if (copy_uvm(process->page_map, current_process->page_map,
-                 current_process->brk - 0x400000) == false) {
+    if (share_uvm(process->page_map, current_process->page_map,
+                  current_process->brk - 0x400000) == false) {
         ASSERT(0);
         return -1;
     }
@@ -369,18 +369,7 @@ int exec(struct Process *process, char* name)
 int grow_process(struct Process *process, int64_t inc)
 {
     if (inc > 0) {
-        uint64_t new_brk = process->brk + inc;
-        for (uint64_t addr = PA_UP(process->brk); addr < PA_UP(new_brk); addr += PAGE_SIZE) {
-            void *page = kalloc();
-            if (!page)
-                return -1;
-            memset(page, 0, PAGE_SIZE);
-            if (!map_pages(process->page_map, addr, addr + PAGE_SIZE, V2P(page), PTE_P|PTE_W|PTE_U)) {
-                kfree((uint64_t)page);
-                return -1;
-            }
-        }
-        process->brk = new_brk;
+        process->brk += inc;
     } else if (inc < 0) {
         uint64_t dec = -inc;
         if (dec > process->brk - 0x400000)

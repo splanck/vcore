@@ -20,6 +20,12 @@ struct Page {
     struct Page* next;
 };
 
+/* reference counts for physical pages */
+void page_incref(uint64_t pa);
+void page_decref(uint64_t pa);
+uint16_t page_getref(uint64_t pa);
+bool share_uvm(uint64_t dst_map, uint64_t src_map, int size);
+
 typedef uint64_t PDE;
 typedef PDE* PD;
 typedef PD* PDPTR;
@@ -52,6 +58,7 @@ bool setup_uvm(uint64_t map, uint64_t start, int size);
 uint64_t setup_kvm(void);
 uint64_t get_total_memory(void);
 bool copy_uvm(uint64_t dst_map, uint64_t src_map, int size);
+PD find_pdpt_entry(uint64_t map, uint64_t v, int alloc, uint32_t attribute);
 
 void init_kheap(void);
 void *kmalloc(size_t size);
