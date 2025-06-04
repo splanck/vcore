@@ -10,6 +10,7 @@
 extern struct TSS Tss;
 static struct Process process_table[NUM_PROC];
 static int pid_num = 1;
+static const int time_slice_table[MAX_PRIORITY] = {1, 2, 4, 8};
 
 static void set_tss(struct Process *proc)
 {
@@ -43,6 +44,8 @@ static struct Process* alloc_new_process(void)
     proc->state = PROC_INIT;
     proc->pid = pid_num++;
     proc->priority = 1;
+    proc->time_slice = time_slice_table[proc->priority];
+    proc->runtime = 0;
     proc->cpu_id = cpu_current()->id;
 
     proc->stack = (uint64_t)kalloc();
@@ -94,9 +97,12 @@ static void init_idle_process(void)
     process->priority = MAX_PRIORITY - 1;
     process->cpu_id = 0;
     process->brk = 0;
+    process->time_slice = time_slice_table[process->priority];
+    process->runtime = 0;
 
     process_control = get_pc();
     process_control->current_process = process;
+    process_control->need_resched = 0;
 }
 
 static void init_user_process(void)
@@ -148,6 +154,7 @@ static void schedule(void)
     struct HeadList *list;
 
     process_control = get_pc();
+    process_control->need_resched = 0;
     prev_proc = process_control->current_process;
     current_proc = NULL;
 
@@ -182,6 +189,7 @@ static void schedule(void)
 
     current_proc->state = PROC_RUNNING;
     current_proc->cpu_id = cpu_current()->id;
+    current_proc->time_slice = time_slice_table[current_proc->priority];
     process_control->current_process = current_proc;
 
     switch_process(prev_proc, current_proc);
@@ -198,6 +206,9 @@ void yield(void)
     process->state = PROC_READY;
 
     if (process->pid != 0) {
+        if (process->time_slice <= 0 && process->priority < MAX_PRIORITY - 1)
+            process->priority++;
+        process->time_slice = time_slice_table[process->priority];
         list = &process_control->ready_list[process->priority];
         append_list_tail(list, (struct List*)process);
     }

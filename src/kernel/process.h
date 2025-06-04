@@ -12,8 +12,10 @@ struct Process {
         int wait;
     int priority;
     int cpu_id;
+    int time_slice;
+    uint64_t runtime;
         struct FileDesc *file[100];
-	uint64_t context;
+        uint64_t context;
         uint64_t page_map;
         uint64_t stack;
         struct TrapFrame *tf;
@@ -46,6 +48,7 @@ struct ProcessControl {
     struct HeadList ready_list[MAX_PRIORITY];
     struct HeadList wait_list;
     struct HeadList kill_list;
+    int need_resched;
 };
 
 #define STACK_SIZE (2*1024*1024)

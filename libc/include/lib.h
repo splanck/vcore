@@ -46,5 +46,7 @@ int socket(int type);
 int sendto(int sock, void *buf, uint32_t size);
 int recvfrom(int sock, void *buf, uint32_t size);
 void set_priority(int prio);
+int get_priority(void);
+unsigned long get_runtime(void);
 
 #endif

@@ -8,7 +8,7 @@
 #include "file.h"
 #include "net/socket.h"
 
-static SYSTEMCALL system_calls[25];
+static SYSTEMCALL system_calls[27];
 
 static int sys_sbrk(int64_t *argptr)
 {
@@ -155,6 +155,18 @@ static int sys_set_priority(int64_t *argptr)
     return 0;
 }
 
+static int sys_get_priority(int64_t *argptr)
+{
+    struct ProcessControl *pc = get_pc();
+    return pc->current_process->priority;
+}
+
+static int sys_get_runtime(int64_t *argptr)
+{
+    struct ProcessControl *pc = get_pc();
+    return (int)pc->current_process->runtime;
+}
+
 static int sys_socket(int64_t *argptr)
 {
     return socket_create((int)argptr[0]);
@@ -193,10 +205,12 @@ void init_system_call(void)
     system_calls[18] = sys_sendto;
     system_calls[19] = sys_recvfrom;
     system_calls[20] = sys_set_priority;
-    system_calls[21] = sys_mkdir;
-    system_calls[22] = sys_opendir;
-    system_calls[23] = sys_readdir;
-    system_calls[24] = sys_rmdir;
+    system_calls[21] = sys_get_priority;
+    system_calls[22] = sys_get_runtime;
+    system_calls[23] = sys_mkdir;
+    system_calls[24] = sys_opendir;
+    system_calls[25] = sys_readdir;
+    system_calls[26] = sys_rmdir;
 }
 
 void system_call(struct TrapFrame *tf)
@@ -205,7 +219,7 @@ void system_call(struct TrapFrame *tf)
     int64_t param_count = tf->rdi;
     int64_t *argptr = (int64_t*)tf->rsi;
 
-    if (param_count < 0 || i > 24 || i < 0) {
+    if (param_count < 0 || i > 26 || i < 0) {
         tf->rax = -1;
         return;
     }
