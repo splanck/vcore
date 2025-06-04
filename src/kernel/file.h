@@ -70,5 +70,8 @@ int open_file(struct Process *proc, char *path_name);
 uint32_t get_file_size(struct Process *proc, int fd);
 int read_root_file(char *buffer);
 int read_root_directory(char *buffer);
+int create_file(char *name);
+int write_file(struct Process *proc, int fd, void *buffer, uint32_t size);
+int delete_file(char *name);
 
 #endif

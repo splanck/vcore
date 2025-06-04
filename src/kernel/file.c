@@ -256,6 +256,115 @@ static uint32_t read_raw_data(uint32_t cluster_index, char *buffer, uint32_t pos
     return read_size;
 }
 
+static uint32_t get_total_sectors(void)
+{
+    struct BPB* bpb = get_fs_bpb();
+
+    return bpb->sector_count != 0 ? bpb->sector_count : bpb->large_sector_count;
+}
+
+static uint32_t get_total_clusters(void)
+{
+    struct BPB* bpb = get_fs_bpb();
+    uint32_t root_sectors = ((uint32_t)bpb->root_entry_count * sizeof(struct DirEntry) + bpb->bytes_per_sector - 1) / bpb->bytes_per_sector;
+    uint32_t data_sectors = get_total_sectors() - bpb->reserved_sector_count - bpb->fat_count * bpb->sectors_per_fat - root_sectors;
+
+    return data_sectors / bpb->sectors_per_cluster + 2;
+}
+
+static uint32_t allocate_cluster(uint16_t prev)
+{
+    uint16_t *fat = get_fat_table();
+    uint32_t count = get_total_clusters();
+
+    for (uint32_t i = 2; i < count; i++) {
+        if (fat[i] == 0) {
+            fat[i] = 0xffff;
+            if (prev >= 2)
+                fat[prev] = i;
+            struct BPB* bpb = get_fs_bpb();
+            memset((char*)((uint64_t)bpb + get_cluster_offset(i)), 0, get_cluster_size());
+            return i;
+        }
+    }
+
+    return 0;
+}
+
+static void release_chain(uint32_t start)
+{
+    uint16_t *fat = get_fat_table();
+    uint32_t index = start;
+
+    while (index >= 2 && index < 0xfff7) {
+        uint32_t next = fat[index];
+        fat[index] = 0;
+        index = next;
+    }
+}
+
+static uint32_t write_raw_data(uint32_t cluster_index, char *buffer, uint32_t position, uint32_t size)
+{
+    uint32_t written = 0;
+    uint32_t index = cluster_index;
+    uint32_t cluster_size = get_cluster_size();
+    uint32_t count = position / cluster_size;
+    uint32_t offset = position % cluster_size;
+
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t next = get_cluster_value(index);
+        if (next >= 0xfff7) {
+            next = allocate_cluster(index);
+            if (next == 0)
+                return written;
+        }
+        index = next;
+    }
+
+    struct BPB* bpb = get_fs_bpb();
+    char *data;
+
+    if (offset != 0) {
+        uint32_t to_write = (offset + size) <= cluster_size ? size : (cluster_size - offset);
+        data = (char*)((uint64_t)bpb + get_cluster_offset(index));
+        memcpy(data + offset, buffer, to_write);
+        written += to_write;
+        buffer += to_write;
+        size -= to_write;
+        if (size == 0)
+            return written;
+        uint32_t next = get_cluster_value(index);
+        if (next >= 0xfff7) {
+            next = allocate_cluster(index);
+            if (next == 0)
+                return written;
+        }
+        index = next;
+    }
+
+    while (size > 0) {
+        data = (char*)((uint64_t)bpb + get_cluster_offset(index));
+        uint32_t to_write = size > cluster_size ? cluster_size : size;
+        memcpy(data, buffer, to_write);
+        written += to_write;
+        buffer += to_write;
+        size -= to_write;
+
+        if (size == 0)
+            break;
+
+        uint32_t next = get_cluster_value(index);
+        if (next >= 0xfff7) {
+            next = allocate_cluster(index);
+            if (next == 0)
+                break;
+        }
+        index = next;
+    }
+
+    return written;
+}
+
 int read_file(struct Process *proc, int fd, void *buffer, uint32_t size)
 {
     uint32_t position = proc->file[fd]->position;
@@ -297,6 +406,75 @@ int read_root_directory(char *buffer)
     memcpy(buffer, dir_entry, count * sizeof(struct DirEntry));
         
     return count;
+}
+
+int create_file(char *path)
+{
+    char name[8] = {"        "};
+    char ext[3] = {"   "};
+    struct DirEntry *dir = get_root_directory();
+    uint32_t count = get_root_directory_count();
+
+    if (!split_path(path, name, ext))
+        return -1;
+
+    for (uint32_t i = 0; i < count; i++) {
+        if (dir[i].name[0] != ENTRY_EMPTY && dir[i].name[0] != ENTRY_DELETED)
+            if (is_file_name_equal(&dir[i], name, ext))
+                return -1;
+    }
+
+    uint32_t free_index = 0xffffffff;
+    for (uint32_t i = 0; i < count; i++) {
+        if (dir[i].name[0] == ENTRY_EMPTY || dir[i].name[0] == ENTRY_DELETED) {
+            free_index = i;
+            break;
+        }
+    }
+
+    if (free_index == 0xffffffff)
+        return -1;
+
+    uint32_t cluster = allocate_cluster(0);
+    if (cluster == 0)
+        return -1;
+
+    memset(&dir[free_index], 0, sizeof(struct DirEntry));
+    memcpy(dir[free_index].name, name, 8);
+    memcpy(dir[free_index].ext, ext, 3);
+    dir[free_index].cluster_index = cluster;
+    dir[free_index].file_size = 0;
+
+    return 0;
+}
+
+int write_file(struct Process *proc, int fd, void *buffer, uint32_t size)
+{
+    struct FCB *fcb = proc->file[fd]->fcb;
+    uint32_t written = write_raw_data(fcb->cluster_index, buffer, proc->file[fd]->position, size);
+
+    proc->file[fd]->position += written;
+    if (proc->file[fd]->position > fcb->file_size)
+        fcb->file_size = proc->file[fd]->position;
+
+    struct DirEntry *dir = get_root_directory();
+    dir[fcb->dir_index].file_size = fcb->file_size;
+    dir[fcb->dir_index].cluster_index = fcb->cluster_index;
+
+    return written;
+}
+
+int delete_file(char *path)
+{
+    uint32_t index = search_file(path);
+    if (index == 0xffffffff)
+        return -1;
+
+    struct DirEntry *dir = get_root_directory();
+    release_chain(dir[index].cluster_index);
+    dir[index].name[0] = ENTRY_DELETED;
+
+    return 0;
 }
 
 static bool init_fcb(void)

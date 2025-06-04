@@ -12,6 +12,9 @@ global close_file
 global fork
 global exec
 global read_root_directory
+global create_file
+global write_file
+global delete_file
 
 writeu:
     sub rsp,16
@@ -172,6 +175,48 @@ read_root_directory:
 sbrk:
     sub rsp,8
     mov eax,13
+
+    mov [rsp],rdi
+    mov rdi,1
+    mov rsi,rsp
+
+    int 0x80
+
+    add rsp,8
+    ret
+
+create_file:
+    sub rsp,8
+    mov eax,14
+
+    mov [rsp],rdi
+    mov rdi,1
+    mov rsi,rsp
+
+    int 0x80
+
+    add rsp,8
+    ret
+
+write_file:
+    sub rsp,24
+    mov eax,15
+
+    mov [rsp],rdi
+    mov [rsp+8],rsi
+    mov [rsp+16],rdx
+
+    mov rdi,3
+    mov rsi,rsp
+
+    int 0x80
+
+    add rsp,24
+    ret
+
+delete_file:
+    sub rsp,8
+    mov eax,16
 
     mov [rsp],rdi
     mov rdi,1
