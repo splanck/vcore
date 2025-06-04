@@ -6,6 +6,7 @@
 
 struct FILE {
     int fd;
+    long pos;
 };
 
 static int udecimal_to_string(char *buffer, int position, unsigned long long d)
@@ -198,6 +199,7 @@ FILE *fopen(const char *path, const char *mode)
     if (!f)
         return NULL;
     f->fd = fd;
+    f->pos = 0;
     return f;
 }
 
@@ -206,6 +208,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     int r = read_file(stream->fd, ptr, size * nmemb);
     if (r < 0)
         return 0;
+    stream->pos += r;
     return (size_t)r / size;
 }
 
@@ -214,21 +217,67 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     int r = write_file(stream->fd, (void*)ptr, size * nmemb);
     if (r < 0)
         return 0;
+    stream->pos += r;
     return (size_t)r / size;
 }
 
 int fseek(FILE *stream, long offset, int whence)
 {
-    (void)stream; (void)offset; (void)whence;
-    errno = EIO;
-    return -1;
+    if (!stream) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    long size = get_file_size(stream->fd);
+    if (size < 0) {
+        errno = EIO;
+        return -1;
+    }
+
+    long target;
+    switch (whence) {
+    case SEEK_SET:
+        target = offset;
+        break;
+    case SEEK_CUR:
+        target = stream->pos + offset;
+        break;
+    case SEEK_END:
+        target = size + offset;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (target < stream->pos || target < 0 || target > size) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    char buf[64];
+    while (stream->pos < target) {
+        long chunk = target - stream->pos;
+        if (chunk > (long)sizeof(buf))
+            chunk = sizeof(buf);
+        int r = read_file(stream->fd, buf, (int)chunk);
+        if (r != chunk) {
+            errno = EIO;
+            return -1;
+        }
+        stream->pos += r;
+    }
+
+    return 0;
 }
 
 long ftell(FILE *stream)
 {
-    (void)stream;
-    errno = EIO;
-    return -1L;
+    if (!stream) {
+        errno = EINVAL;
+        return -1L;
+    }
+    return stream->pos;
 }
 
 int fclose(FILE *stream)
