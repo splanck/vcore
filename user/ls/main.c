@@ -1,4 +1,6 @@
-#include "lib.h"
+#include <stdio.h>
+#include <string.h>
+#include <lib.h>
 
 struct DirEntry buffer[1024];
 

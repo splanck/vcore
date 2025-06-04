@@ -1,5 +1,6 @@
-#include "lib.h"
-#include "stdint.h"
+#include <stdio.h>
+#include <lib.h>
+#include <stdint.h>
 
 int main(void)
 {
