@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
+# Install build dependencies (Debian/Ubuntu)
+sudo apt-get update
+sudo apt-get install -y build-essential bison flex libgmp-dev libmpc-dev \
+    libmpfr-dev texinfo wget
+
 # Versions
 BINUTILS_VER=${BINUTILS_VER:-2.41}
 GCC_VER=${GCC_VER:-13.2.0}

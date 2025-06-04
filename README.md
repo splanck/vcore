@@ -21,7 +21,9 @@ The Makefile uses tools like `$(CROSS)gcc`, `$(CROSS)ld`, and
 A helper script `scripts/build-toolchain.sh` can build a suitable
 cross‑compiler.  It downloads and compiles binutils and GCC into
 `$HOME/opt/cross` (or the directory specified by the `PREFIX` variable).
-After running the script, point `CROSS` at the resulting prefix.
+The script also installs all required build dependencies on Debian
+systems using `apt`.  After running the script, point `CROSS` at the
+resulting prefix.
 
 ```bash
 ./scripts/build-toolchain.sh
