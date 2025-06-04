@@ -42,6 +42,8 @@ void init_idt(void)
     init_idt_entry(&vectors[32],(uint64_t)vector32,0x8e);
     init_idt_entry(&vectors[33],(uint64_t)vector33,0x8e);
     init_idt_entry(&vectors[39],(uint64_t)vector39,0x8e);
+    init_idt_entry(&vectors[40],(uint64_t)vector40,0x8e);
+    init_idt_entry(&vectors[41],(uint64_t)vector41,0x8e);
     init_idt_entry(&vectors[0x80],(uint64_t)sysint,0xee);
 
     idt_pointer.limit = sizeof(vectors)-1;
@@ -127,6 +129,15 @@ void handler(struct TrapFrame *tf)
             }
             break;
 
+        case 40:
+            eoi();
+            break;
+
+        case 41:
+            invalidate_tlb();
+            eoi();
+            break;
+
         case 14:
             if (handle_page_fault(tf) < 0) {
                 if ((tf->cs & 3) == 3)
@@ -150,7 +161,7 @@ void handler(struct TrapFrame *tf)
             }
     }
 
-    if (tf->trapno == 32) {       
+    if (tf->trapno == 32 || tf->trapno == 40) {
         yield();
     }
 }

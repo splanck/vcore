@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "lib.h"
 #include "stddef.h"
+#include "trap.h"
 #include "stdbool.h"
 
 static void free_region(uint64_t v, uint64_t e);
@@ -376,3 +377,9 @@ bool share_uvm(uint64_t dst_map, uint64_t src_map, int size)
 
     return true;
 }
+
+void invalidate_tlb(void)
+{
+    load_cr3(read_cr3());
+}
+

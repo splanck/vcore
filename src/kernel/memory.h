@@ -64,5 +64,7 @@ void init_kheap(void);
 void *kmalloc(size_t size);
 void kmfree(void *ptr);
 
+void invalidate_tlb(void);
+
 
 #endif
