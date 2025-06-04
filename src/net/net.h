@@ -26,6 +26,7 @@ struct udp_header {
 void arp_init(void);
 void arp_insert(uint32_t ip, const uint8_t *mac);
 int arp_lookup(uint32_t ip, uint8_t *mac);
+void arp_input(const uint8_t *pkt, uint16_t len);
 
 int ipv4_send(uint32_t dst_ip, uint8_t proto, const uint8_t *data, uint16_t len);
 void ipv4_input(const uint8_t *pkt, uint16_t len);
