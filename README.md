@@ -1,1 +1,41 @@
 # vcore
+
+`vcore` is a small educational 64-bit operating system.  The project is
+split into a bootloader, kernel sources, and a few user-space programs.
+
+## Repository Layout
+
+- `boot/` – boot sector and second-stage loader
+- `src/` – kernel source code
+- `user/` – example user programs
+- `lib/` – common runtime for the user programs
+- `link.lds` – linker script used when building the kernel
+
+## Toolchain
+
+Building requires `nasm`, a GCC cross‑compiler for x86_64 (set with the
+`CROSS` make variable) and `qemu-system-x86_64` for running the image.
+The Makefile uses tools like `$(CROSS)gcc`, `$(CROSS)ld`, and
+`$(CROSS)objcopy`.
+
+## Building
+
+Run `make` at the repository root.  This compiles the kernel, bootloader
+and user programs and produces `os.img`.
+
+```bash
+make
+```
+
+## Running
+
+You can boot the resulting image with QEMU.  A typical command is:
+
+```bash
+qemu-system-x86_64 -drive format=raw,file=os.img
+```
+
+## License
+
+This project is distributed under the terms of the GNU General Public
+License version&nbsp;3.  See the `LICENSE` file for full details.
