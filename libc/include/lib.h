@@ -34,5 +34,6 @@ int get_file_size(int fd);
 int read_root_directory(void *buffer);
 int fork(void);
 void exec(char *name);
+void *sbrk(int64_t inc);
 
 #endif

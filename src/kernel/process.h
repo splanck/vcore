@@ -6,15 +6,16 @@
 #include "file.h"
 
 struct Process {
-	struct List *next;
+        struct List *next;
     int pid;
 	int state;
 	int wait;
 	struct FileDesc *file[100];
 	uint64_t context;
-	uint64_t page_map;	
-	uint64_t stack;
-	struct TrapFrame *tf;
+        uint64_t page_map;
+        uint64_t stack;
+        struct TrapFrame *tf;
+        uint64_t brk;
 };
 
 struct TSS {
@@ -61,5 +62,6 @@ void exit(void);
 void wait(int pid);
 int fork(void);
 int exec(struct Process *process, char *name);
+int grow_process(struct Process *process, int64_t inc);
 
 #endif

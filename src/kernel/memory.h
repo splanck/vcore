@@ -45,12 +45,17 @@ void init_kvm(void);
 bool map_pages(uint64_t map, uint64_t v, uint64_t e, uint64_t pa, uint32_t attribute);
 void switch_vm(uint64_t map);
 void load_cr3(uint64_t map);
-void free_vm(uint64_t map);
+void free_vm(uint64_t map, uint64_t size);
+void free_pages(uint64_t map, uint64_t vstart, uint64_t vend);
 void free_page(uint64_t map, uint64_t v, uint64_t e);
 bool setup_uvm(uint64_t map, uint64_t start, int size);
 uint64_t setup_kvm(void);
 uint64_t get_total_memory(void);
 bool copy_uvm(uint64_t dst_map, uint64_t src_map, int size);
+
+void init_kheap(void);
+void *kmalloc(size_t size);
+void kmfree(void *ptr);
 
 
 #endif

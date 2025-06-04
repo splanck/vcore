@@ -14,7 +14,8 @@ void KMain(void)
    memset(&bss_start, 0, size);
    
    init_idt();
-   init_memory();  
+   init_memory();
+   init_kheap();
    init_kvm();
    init_system_call();
    init_fs();
