@@ -109,6 +109,22 @@ static int sys_read_root_directory(int64_t *argptr)
     return read_root_directory((char*)argptr[0]);
 }
 
+static int sys_create_file(int64_t *argptr)
+{
+    return create_file((char*)argptr[0]);
+}
+
+static int sys_write_file(int64_t *argptr)
+{
+    struct ProcessControl *pc = get_pc();
+    return write_file(pc->current_process, argptr[0], (void*)argptr[1], argptr[2]);
+}
+
+static int sys_delete_file(int64_t *argptr)
+{
+    return delete_file((char*)argptr[0]);
+}
+
 void init_system_call(void)
 {
     system_calls[0] = sys_write;
@@ -125,6 +141,9 @@ void init_system_call(void)
     system_calls[11] = sys_exec;
     system_calls[12] = sys_read_root_directory;
     system_calls[13] = sys_sbrk;
+    system_calls[14] = sys_create_file;
+    system_calls[15] = sys_write_file;
+    system_calls[16] = sys_delete_file;
 }
 
 void system_call(struct TrapFrame *tf)
@@ -133,7 +152,7 @@ void system_call(struct TrapFrame *tf)
     int64_t param_count = tf->rdi;
     int64_t *argptr = (int64_t*)tf->rsi;
 
-    if (param_count < 0 || i > 13 || i < 0) {
+    if (param_count < 0 || i > 16 || i < 0) {
         tf->rax = -1;
         return;
     }

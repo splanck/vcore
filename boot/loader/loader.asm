@@ -99,11 +99,18 @@ LoadFS:
 
 BigRealMode:
     sti
-    mov cx,203*16*63/100
-    xor ebx,ebx
-    mov edi,0x30000000
     xor ax,ax
     mov fs,ax
+    mov eax,[0x7dca]
+    mov edx,[0x7dc6]
+    add eax,edx
+    mov ecx,100
+    xor edx,edx
+    div ecx
+    mov cx,ax
+    mov si,dx
+    xor ebx,ebx
+    mov edi,0x30000000
 
 ReadFAT:
     push ecx
@@ -140,15 +147,19 @@ ReadRemainingSectors:
     push edi
     push fs
 
-    mov ax,(203*16*63) % 100
+    mov ax,si
+    cmp ax,0
+    je NoRemainRead
     call ReadSectors
     test al,al
     jnz  ReadError
+NoRemainRead:
 
     pop fs
     pop edi
-    
-    mov cx,(((203*16*63) % 100) * 512)/4
+
+    mov cx,si
+    shl cx,7
     mov esi,0x60000
 
 CopyRemainingData: 
