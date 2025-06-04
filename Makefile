@@ -8,9 +8,9 @@ CFLAGS = -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zo
 LDFLAGS = -nostdlib
 
 C_SRCS := $(wildcard src/kernel/*.c)
-ASM_SRCS := $(wildcard src/kernel/*.asm)
+ASM_SRCS := $(wildcard src/arch/x86/*.asm)
 C_OBJS := $(patsubst src/kernel/%.c,$(OBJDIR)/%.o,$(C_SRCS))
-ASM_OBJS := $(patsubst src/kernel/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
+ASM_OBJS := $(patsubst src/arch/x86/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
 KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
 
 $(OBJDIR):
@@ -28,7 +28,7 @@ kernel: $(OBJDIR) $(KERNEL_OBJS)
 $(OBJDIR)/%.o: src/kernel/%.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -o $@ $<
 
-$(OBJDIR)/%_asm.o: src/kernel/%.asm | $(OBJDIR)
+$(OBJDIR)/%_asm.o: src/arch/x86/%.asm | $(OBJDIR)
 	$(NASM) -f elf64 -o $@ $<
 	
 # Bootloader build
