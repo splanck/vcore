@@ -29,11 +29,13 @@ make
 
 ## Running
 
-You can boot the resulting image with QEMU.  A typical command is:
+You can boot the resulting image with QEMU using the `run` target:
 
 ```bash
-qemu-system-x86_64 -drive format=raw,file=os.img
+make run
 ```
+
+This executes `qemu-system-x86_64 -drive format=raw,file=os.img`.
 
 ## License
 
