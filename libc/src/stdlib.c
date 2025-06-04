@@ -73,3 +73,13 @@ void exit(int status)
     exitu();
 }
 
+int atoi(const char *nptr)
+{
+    return (int)strtol(nptr, NULL, 10);
+}
+
+int abs(int n)
+{
+    return n < 0 ? -n : n;
+}
+
