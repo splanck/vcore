@@ -8,7 +8,7 @@
 #include "file.h"
 #include "net/socket.h"
 
-static SYSTEMCALL system_calls[20];
+static SYSTEMCALL system_calls[21];
 
 static int sys_sbrk(int64_t *argptr)
 {
@@ -126,6 +126,13 @@ static int sys_delete_file(int64_t *argptr)
     return delete_file((char*)argptr[0]);
 }
 
+static int sys_set_priority(int64_t *argptr)
+{
+    struct ProcessControl *pc = get_pc();
+    set_process_priority(pc->current_process, argptr[0]);
+    return 0;
+}
+
 static int sys_socket(int64_t *argptr)
 {
     return socket_create((int)argptr[0]);
@@ -163,6 +170,7 @@ void init_system_call(void)
     system_calls[17] = sys_socket;
     system_calls[18] = sys_sendto;
     system_calls[19] = sys_recvfrom;
+    system_calls[20] = sys_set_priority;
 }
 
 void system_call(struct TrapFrame *tf)
@@ -171,7 +179,7 @@ void system_call(struct TrapFrame *tf)
     int64_t param_count = tf->rdi;
     int64_t *argptr = (int64_t*)tf->rsi;
 
-    if (param_count < 0 || i > 19 || i < 0) {
+    if (param_count < 0 || i > 20 || i < 0) {
         tf->rax = -1;
         return;
     }

@@ -231,6 +231,7 @@ delete_file:
 global socket
 global sendto
 global recvfrom
+global set_priority
 
 socket:
     sub rsp,8
@@ -264,6 +265,16 @@ recvfrom:
     mov rsi,rsp
     int 0x80
     add rsp,24
+    ret
+
+set_priority:
+    sub rsp,8
+    mov eax,20
+    mov [rsp],rdi
+    mov rdi,1
+    mov rsi,rsp
+    int 0x80
+    add rsp,8
     ret
 
 
