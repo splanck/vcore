@@ -5,6 +5,7 @@
 #include "lib.h"
 #include "debug.h"
 #include "cpu.h"
+#include "elf.h"
 
 extern struct TSS Tss;
 static struct Process process_table[NUM_PROC];
@@ -111,7 +112,7 @@ static void init_user_process(void)
 
     list = &process_control->ready_list[process->priority];
 
-    ASSERT(setup_uvm(process->page_map, P2V(0x30000), 5120));
+    ASSERT(load_elf(process, (void*)P2V(0x30000)) == true);
 
     process->state = PROC_READY;
     append_list_tail(list, (struct List*)process);
@@ -342,18 +343,22 @@ int exec(struct Process *process, char* name)
 {
     int fd;
     uint32_t size;
-    
-    fd = open_file(process, name);
+    void *buf;
 
-    if (fd == -1) {
+    fd = open_file(process, name);
+    if (fd == -1)
+        exit();
+
+    size = get_file_size(process, fd);
+    buf = kmalloc(size);
+    if (!buf) {
+        close_file(process, fd);
         exit();
     }
 
-    memset((void*)0x400000, 0, PAGE_SIZE);
-    size = get_file_size(process, fd);
-    size = read_file(process, fd, (void*)0x400000, size);
-    
-    if (size == 0xffffffff) {
+    if (read_file(process, fd, buf, size) != size) {
+        kmfree(buf);
+        close_file(process, fd);
         exit();
     }
 
@@ -361,12 +366,15 @@ int exec(struct Process *process, char* name)
 
     memset(process->tf, 0, sizeof(struct TrapFrame));
     process->tf->cs = 0x10|3;
-    process->tf->rip = 0x400000;
     process->tf->ss = 0x18|3;
-    process->tf->rsp = 0x400000 + PAGE_SIZE;
     process->tf->rflags = 0x202;
-    process->brk = 0x400000 + PAGE_SIZE;
 
+    if (!load_elf(process, buf)) {
+        kmfree(buf);
+        exit();
+    }
+
+    kmfree(buf);
     return 0;
 }
 

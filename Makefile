@@ -38,8 +38,8 @@ libc: $(LIBC_ARCHIVE)
 
 # Kernel build
 kernel: $(OBJDIR) $(KERNEL_OBJS)
-	$(LD) $(LDFLAGS) -T link.lds -o $@ $(KERNEL_OBJS)
-	$(OBJCOPY) -O binary kernel kernel.bin
+	$(LD) $(LDFLAGS) -T link.lds -o kernel.elf $(KERNEL_OBJS)
+	$(OBJCOPY) -O binary kernel.elf kernel.bin
 
 $(OBJDIR)/%.o: src/kernel/%.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -o $@ $<
@@ -88,53 +88,47 @@ os.img: boot/boot.bin boot/loader/loader.bin
 	dd if=boot/loader/loader.bin of=$@ bs=512 count=15 seek=1 conv=notrunc
 
 # User programs
-users: libc user/ls/ls user/test/test.bin user/totalmem/totalmem user/user1/user.bin user/ping/ping user/cow/cow
+users: libc user/ls/ls.elf user/test/test.elf user/totalmem/totalmem.elf user/user1/user.elf user/ping/ping.elf user/cow/cow.elf
 
-user/ls/ls:
+user/ls/ls.elf:
 	cd user/ls && \
 	$(NASM) -f elf64 -o start.o start.asm && \
 	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
-	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
-	$(OBJCOPY) -O binary user ls
+       $(LD) $(LDFLAGS) -T link.lds -o ls.elf start.o main.o ../../libc/libc.a
 	
-user/test/test.bin:
+user/test/test.elf:
 	cd user/test && \
 	$(NASM) -f elf64 -o start.o start.asm && \
 	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
-	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
-	$(OBJCOPY) -O binary user test.bin
+       $(LD) $(LDFLAGS) -T link.lds -o test.elf start.o main.o ../../libc/libc.a
 
-user/totalmem/totalmem:
+user/totalmem/totalmem.elf:
 	cd user/totalmem && \
 	$(NASM) -f elf64 -o start.o start.asm && \
 	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
-	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
-	$(OBJCOPY) -O binary user totalmem
-user/user1/user.bin:
+       $(LD) $(LDFLAGS) -T link.lds -o totalmem.elf start.o main.o ../../libc/libc.a
+user/user1/user.elf:
 	cd user/user1 && \
 	$(NASM) -f elf64 -o start.o start.asm && \
 	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
-	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
-	$(OBJCOPY) -O binary user user.bin
-user/ping/ping:
+       $(LD) $(LDFLAGS) -T link.lds -o user.elf start.o main.o ../../libc/libc.a
+user/ping/ping.elf:
 
 	cd user/ping && \
 	$(NASM) -f elf64 -o start.o start.asm && \
 	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
-	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
-        $(OBJCOPY) -O binary user ping
+       $(LD) $(LDFLAGS) -T link.lds -o ping.elf start.o main.o ../../libc/libc.a
 
-user/cow/cow:
+user/cow/cow.elf:
 	cd user/cow && \
 	$(NASM) -f elf64 -o start.o start.asm && \
 	$(CC) $(CFLAGS) -I ../../libc/include -c main.c && \
-	$(LD) $(LDFLAGS) -T link.lds -o user start.o main.o ../../libc/libc.a && \
-	$(OBJCOPY) -O binary user cow
+       $(LD) $(LDFLAGS) -T link.lds -o cow.elf start.o main.o ../../libc/libc.a
 
 clean:
-	rm -rf $(OBJDIR) kernel kernel.bin
-		rm -f boot/boot.bin boot/loader/*.o boot/loader/entry boot/loader/entry.bin boot/loader/loader.bin os.img
-	rm -f user/*/*.o user/*/user user/*/*.bin
+	rm -rf $(OBJDIR) kernel.elf kernel.bin
+	rm -f boot/boot.bin boot/loader/*.o boot/loader/entry boot/loader/entry.bin boot/loader/loader.bin os.img
+	rm -f user/*/*.o user/*/*.elf
 
 run: os.img
 	qemu-system-x86_64 -drive format=raw,file=os.img
