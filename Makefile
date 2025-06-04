@@ -18,7 +18,8 @@ $(patsubst src/net/%.c,$(OBJDIR)/%.o,$(NET_SRCS))
 ASM_OBJS := $(patsubst src/arch/x86/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
 KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
 
-LIBC_C_SRCS := $(wildcard libc/src/*.c)
+LIBC_C_SRCS := libc/src/printf.c libc/src/stdlib.c libc/src/string.c \
+               libc/src/stdio.c libc/src/ctype.c libc/src/strtol.c
 LIBC_ASM_SRCS := $(wildcard libc/src/*.asm)
 LIBC_C_OBJS := $(patsubst libc/src/%.c,$(OBJDIR)/libc_%.o,$(LIBC_C_SRCS))
 LIBC_ASM_OBJS := $(patsubst libc/src/%.asm,$(OBJDIR)/libc_%.o,$(LIBC_ASM_SRCS))

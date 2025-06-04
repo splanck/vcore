@@ -15,6 +15,7 @@ global read_root_directory
 global create_file
 global write_file
 global delete_file
+global sbrk
 
 writeu:
     sub rsp,16

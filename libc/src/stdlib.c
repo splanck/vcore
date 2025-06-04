@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <lib.h>
 #include <stddef.h>
+#include <string.h>
 
 struct block {
     size_t size;
@@ -36,6 +37,34 @@ void free(void *ptr)
     struct block *b = ((struct block*)ptr) - 1;
     b->next = free_list;
     free_list = b;
+}
+
+void *realloc(void *ptr, size_t size)
+{
+    if (!ptr)
+        return malloc(size);
+    if (size == 0) {
+        free(ptr);
+        return NULL;
+    }
+    struct block *b = ((struct block*)ptr) - 1;
+    if (b->size >= size)
+        return ptr;
+    void *n = malloc(size);
+    if (!n)
+        return NULL;
+    memcpy(n, ptr, b->size);
+    free(ptr);
+    return n;
+}
+
+void *calloc(size_t nmemb, size_t size)
+{
+    size_t total = nmemb * size;
+    void *ptr = malloc(total);
+    if (ptr)
+        memset(ptr, 0, total);
+    return ptr;
 }
 
 void exit(int status)
