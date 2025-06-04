@@ -59,6 +59,7 @@ static struct Process* alloc_new_process(void)
     proc->tf->ss = 0x18|3;
     proc->tf->rsp = 0x400000 + PAGE_SIZE;
     proc->tf->rflags = 0x202;
+    proc->brk = 0x400000 + PAGE_SIZE;
     
     proc->page_map = setup_kvm();
     if (proc->page_map == 0) {
@@ -86,6 +87,7 @@ static void init_idle_process(void)
     process->pid = 0;
     process->page_map = P2V(read_cr3());
     process->state = PROC_RUNNING;
+    process->brk = 0;
 
     process_control = get_pc();
     process_control->current_process = process;
@@ -235,7 +237,7 @@ void wait(int pid)
             if (process != NULL) {
                 ASSERT(process->state == PROC_KILLED);
                 kfree(process->stack);
-                free_vm(process->page_map);            
+                free_vm(process->page_map, process->brk - 0x400000);
 
                 for (int i = 0; i < 100; i++) {
                     if (process->file[i] != NULL) {
@@ -273,7 +275,8 @@ int fork(void)
         return -1;
     }
 
-    if (copy_uvm(process->page_map, current_process->page_map, PAGE_SIZE) == false) {
+    if (copy_uvm(process->page_map, current_process->page_map,
+                 current_process->brk - 0x400000) == false) {
         ASSERT(0);
         return -1;
     }
@@ -289,6 +292,7 @@ int fork(void)
 
     memcpy(process->tf, current_process->tf, sizeof(struct TrapFrame));
     process->tf->rax = 0;
+    process->brk = current_process->brk;
     process->state = PROC_READY;
     append_list_tail(list, (struct List*)process);
 
@@ -322,6 +326,36 @@ int exec(struct Process *process, char* name)
     process->tf->ss = 0x18|3;
     process->tf->rsp = 0x400000 + PAGE_SIZE;
     process->tf->rflags = 0x202;
+    process->brk = 0x400000 + PAGE_SIZE;
+
+    return 0;
+}
+
+int grow_process(struct Process *process, int64_t inc)
+{
+    if (inc > 0) {
+        uint64_t new_brk = process->brk + inc;
+        for (uint64_t addr = PA_UP(process->brk); addr < PA_UP(new_brk); addr += PAGE_SIZE) {
+            void *page = kalloc();
+            if (!page)
+                return -1;
+            memset(page, 0, PAGE_SIZE);
+            if (!map_pages(process->page_map, addr, addr + PAGE_SIZE, V2P(page), PTE_P|PTE_W|PTE_U)) {
+                kfree((uint64_t)page);
+                return -1;
+            }
+        }
+        process->brk = new_brk;
+    } else if (inc < 0) {
+        uint64_t dec = -inc;
+        if (dec > process->brk - 0x400000)
+            dec = process->brk - 0x400000;
+        uint64_t new_brk = process->brk - dec;
+        for (uint64_t addr = PA_UP(new_brk); addr < PA_UP(process->brk); addr += PAGE_SIZE) {
+            free_pages(process->page_map, addr, addr + PAGE_SIZE);
+        }
+        process->brk = new_brk;
+    }
 
     return 0;
 }

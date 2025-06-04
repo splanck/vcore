@@ -9,6 +9,17 @@
 
 static SYSTEMCALL system_calls[20];
 
+static int sys_sbrk(int64_t *argptr)
+{
+    struct ProcessControl *pc = get_pc();
+    struct Process *proc = pc->current_process;
+    int64_t inc = argptr[0];
+    uint64_t old = proc->brk;
+    if (grow_process(proc, inc) < 0)
+        return -1;
+    return old;
+}
+
 static int sys_write(int64_t *argptr)
 {    
     write_screen((char*)argptr[0], (int)argptr[1], 0xf);  
@@ -111,8 +122,9 @@ void init_system_call(void)
     system_calls[8] = sys_get_file_size;
     system_calls[9] = sys_close_file; 
     system_calls[10] = sys_fork; 
-    system_calls[11] = sys_exec; 
-    system_calls[12] = sys_read_root_directory; 
+    system_calls[11] = sys_exec;
+    system_calls[12] = sys_read_root_directory;
+    system_calls[13] = sys_sbrk;
 }
 
 void system_call(struct TrapFrame *tf)
@@ -121,7 +133,7 @@ void system_call(struct TrapFrame *tf)
     int64_t param_count = tf->rdi;
     int64_t *argptr = (int64_t*)tf->rsi;
 
-    if (param_count < 0 || i > 12 || i < 0) { 
+    if (param_count < 0 || i > 13 || i < 0) {
         tf->rax = -1;
         return;
     }

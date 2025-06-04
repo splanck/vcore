@@ -171,7 +171,7 @@ uint64_t setup_kvm(void)
     if (page_map != 0) {
         memset((void*)page_map, 0, PAGE_SIZE);        
         if (!map_pages(page_map, KERNEL_BASE, P2V(0x40000000), V2P(KERNEL_BASE), PTE_P|PTE_W)) {
-            free_vm(page_map);
+            free_vm(page_map, PAGE_SIZE);
             page_map = 0;
         }
     }
@@ -199,7 +199,7 @@ bool setup_uvm(uint64_t map, uint64_t start, int size)
         }
         else {
             kfree((uint64_t)page);
-            free_vm(map);
+            free_vm(map, PAGE_SIZE);
         }
     }
     
@@ -263,9 +263,9 @@ static void free_pml4t(uint64_t map)
     kfree(map);
 }
 
-void free_vm(uint64_t map)
-{   
-    free_pages(map, 0x400000, 0x400000+PAGE_SIZE);
+void free_vm(uint64_t map, uint64_t size)
+{
+    free_pages(map, 0x400000, 0x400000 + PA_UP(size));
     free_pdt(map);
     free_pdpt(map);
     free_pml4t(map);
@@ -273,33 +273,36 @@ void free_vm(uint64_t map)
 
 bool copy_uvm(uint64_t dst_map, uint64_t src_map, int size)
 {
-    bool status = false;
-    unsigned int index;
-    PD pd = NULL;
-    uint64_t start;
-
-    void *page = kalloc();
-    if (page != NULL) {
+    int copied = 0;
+    for (int off = 0; off < size; off += PAGE_SIZE) {
+        void *page = kalloc();
+        if (page == NULL) {
+            free_pages(dst_map, 0x400000, 0x400000 + copied);
+            return false;
+        }
         memset(page, 0, PAGE_SIZE);
-        status = map_pages(dst_map, 0x400000, 0x400000+PAGE_SIZE, V2P(page), PTE_P|PTE_W|PTE_U);
-
-        if (status == true) {
-            pd = find_pdpt_entry(src_map, 0x400000, 0, 0);
-            if (pd == NULL) {
-                free_vm(dst_map);
-                return false;
-            }
-
-            index = (0x400000U >> 21) & 0x1FF;
-            ASSERT(((uint64_t)pd[index] & PTE_P) == 1);
-            start = P2V(PTE_ADDR(pd[index]));
-            memcpy(page, (void*)start, size);
-        }
-        else {
+        if (!map_pages(dst_map, 0x400000 + off, 0x400000 + off + PAGE_SIZE,
+                       V2P(page), PTE_P|PTE_W|PTE_U)) {
             kfree((uint64_t)page);
-            free_vm(dst_map);
+            free_pages(dst_map, 0x400000, 0x400000 + copied);
+            return false;
         }
+
+        PD pd = find_pdpt_entry(src_map, 0x400000 + off, 0, 0);
+        if (pd == NULL) {
+            free_pages(dst_map, 0x400000, 0x400000 + off + PAGE_SIZE);
+            return false;
+        }
+
+        unsigned int index = ((0x400000 + off) >> 21) & 0x1FF;
+        ASSERT((uint64_t)pd[index] & PTE_P);
+        uint64_t start = P2V(PTE_ADDR(pd[index]));
+        int to_copy = size - off;
+        if (to_copy > PAGE_SIZE)
+            to_copy = PAGE_SIZE;
+        memcpy(page, (void*)start, to_copy);
+        copied += PAGE_SIZE;
     }
 
-    return status;
+    return true;
 }
