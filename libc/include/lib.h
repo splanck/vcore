@@ -41,5 +41,6 @@ void *sbrk(int64_t inc);
 int socket(int type);
 int sendto(int sock, void *buf, uint32_t size);
 int recvfrom(int sock, void *buf, uint32_t size);
+void set_priority(int prio);
 
 #endif

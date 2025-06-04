@@ -5,7 +5,7 @@
 #include "lib.h"
 #include "debug.h"
 
-extern struct TSS Tss; 
+extern struct TSS Tss;
 static struct Process process_table[NUM_PROC];
 static int pid_num = 1;
 static struct ProcessControl pc;
@@ -41,6 +41,8 @@ static struct Process* alloc_new_process(void)
 
     proc->state = PROC_INIT;
     proc->pid = pid_num++;
+    proc->priority = 1;
+    proc->cpu_id = 0;
 
     proc->stack = (uint64_t)kalloc();
     if (proc->stack == 0) {
@@ -87,6 +89,8 @@ static void init_idle_process(void)
     process->pid = 0;
     process->page_map = P2V(read_cr3());
     process->state = PROC_RUNNING;
+    process->priority = MAX_PRIORITY - 1;
+    process->cpu_id = 0;
     process->brk = 0;
 
     process_control = get_pc();
@@ -100,10 +104,11 @@ static void init_user_process(void)
     struct HeadList *list;
 
     process_control = get_pc();
-    list = &process_control->ready_list;
 
     process = alloc_new_process();
     ASSERT(process != NULL);
+
+    list = &process_control->ready_list[process->priority];
 
     ASSERT(setup_uvm(process->page_map, P2V(0x30000), 5120));
 
@@ -115,6 +120,15 @@ void init_process(void)
 {
     init_idle_process();
     init_user_process();
+}
+
+void set_process_priority(struct Process *proc, int priority)
+{
+    if (priority < 0)
+        priority = 0;
+    if (priority >= MAX_PRIORITY)
+        priority = MAX_PRIORITY - 1;
+    proc->priority = priority;
 }
 
 static void switch_process(struct Process *prev, struct Process *current)
@@ -133,13 +147,17 @@ static void schedule(void)
 
     process_control = get_pc();
     prev_proc = process_control->current_process;
-    list = &process_control->ready_list;
-    if (is_list_empty(list)) {
+    current_proc = NULL;
+    for (int pr = 0; pr < MAX_PRIORITY; pr++) {
+        list = &process_control->ready_list[pr];
+        if (!is_list_empty(list)) {
+            current_proc = (struct Process*)remove_list_head(list);
+            break;
+        }
+    }
+    if (current_proc == NULL) {
         ASSERT(process_control->current_process->pid != 0);
         current_proc = &process_table[0];
-    }
-    else {
-        current_proc = (struct Process*)remove_list_head(list);
     }
     
     current_proc->state = PROC_RUNNING;   
@@ -155,16 +173,21 @@ void yield(void)
     struct HeadList *list;
     
     process_control = get_pc();
-    list = &process_control->ready_list;
-
-    if (is_list_empty(list)) {
-        return;
+    bool empty = true;
+    for (int pr = 0; pr < MAX_PRIORITY; pr++) {
+        if (!is_list_empty(&process_control->ready_list[pr])) {
+            empty = false;
+            break;
+        }
     }
+    if (empty)
+        return;
 
     process = process_control->current_process;
     process->state = PROC_READY;
 
     if (process->pid != 0) {
+        list = &process_control->ready_list[process->priority];
         append_list_tail(list, (struct List*)process);
     }
 
@@ -193,12 +216,12 @@ void wake_up(int wait)
     struct HeadList *wait_list;
 
     process_control = get_pc();
-    ready_list = &process_control->ready_list;
     wait_list = &process_control->wait_list;
     process = (struct Process*)remove_list(wait_list, wait);
 
-    while (process != NULL) {       
+    while (process != NULL) {
         process->state = PROC_READY;
+        ready_list = &process_control->ready_list[process->priority];
         append_list_tail(ready_list, (struct List*)process);
         process = (struct Process*)remove_list(wait_list, wait);
     }
@@ -267,7 +290,6 @@ int fork(void)
 
     process_control = get_pc();
     current_process = process_control->current_process;
-    list = &process_control->ready_list;
 
     process = alloc_new_process();
     if (process == NULL) {
@@ -293,7 +315,9 @@ int fork(void)
     memcpy(process->tf, current_process->tf, sizeof(struct TrapFrame));
     process->tf->rax = 0;
     process->brk = current_process->brk;
+    process->priority = current_process->priority;
     process->state = PROC_READY;
+    list = &process_control->ready_list[process->priority];
     append_list_tail(list, (struct List*)process);
 
     return process->pid;
