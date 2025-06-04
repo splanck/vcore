@@ -227,5 +227,44 @@ delete_file:
     add rsp,8
     ret
 
+; Socket system calls
+global socket
+global sendto
+global recvfrom
+
+socket:
+    sub rsp,8
+    mov eax,17
+    mov [rsp],rdi
+    mov rdi,1
+    mov rsi,rsp
+    int 0x80
+    add rsp,8
+    ret
+
+sendto:
+    sub rsp,24
+    mov eax,18
+    mov [rsp],rdi
+    mov [rsp+8],rsi
+    mov [rsp+16],rdx
+    mov rdi,3
+    mov rsi,rsp
+    int 0x80
+    add rsp,24
+    ret
+
+recvfrom:
+    sub rsp,24
+    mov eax,19
+    mov [rsp],rdi
+    mov [rsp+8],rsi
+    mov [rsp+16],rdx
+    mov rdi,3
+    mov rsi,rsp
+    int 0x80
+    add rsp,24
+    ret
+
 
 

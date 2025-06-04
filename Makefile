@@ -1,16 +1,20 @@
 CROSS ?=
 NASM = nasm
 CC = $(CROSS)gcc
-LD = $(CROSS)ld
+	LD = $(CROSS)ld
 OBJCOPY = $(CROSS)objcopy
 AR = $(CROSS)ar
-OBJDIR ?= build
-CFLAGS = -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c
+	OBJDIR ?= build
+CFLAGS = -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c -Isrc
 LDFLAGS = -nostdlib
-
+	
 C_SRCS := $(wildcard src/kernel/*.c)
+DRIVER_SRCS := $(wildcard src/drivers/net/*.c)
+NET_SRCS := $(wildcard src/net/*.c)
 ASM_SRCS := $(wildcard src/arch/x86/*.asm)
-C_OBJS := $(patsubst src/kernel/%.c,$(OBJDIR)/%.o,$(C_SRCS))
+C_OBJS := $(patsubst src/kernel/%.c,$(OBJDIR)/%.o,$(C_SRCS)) \
+$(patsubst src/drivers/net/%.c,$(OBJDIR)/%.o,$(DRIVER_SRCS)) \
+$(patsubst src/net/%.c,$(OBJDIR)/%.o,$(NET_SRCS))
 ASM_OBJS := $(patsubst src/arch/x86/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
 KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
 
@@ -36,6 +40,12 @@ kernel: $(OBJDIR) $(KERNEL_OBJS)
 	$(OBJCOPY) -O binary kernel kernel.bin
 
 $(OBJDIR)/%.o: src/kernel/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(OBJDIR)/%.o: src/drivers/net/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(OBJDIR)/%.o: src/net/%.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -o $@ $<
 
 $(OBJDIR)/%_asm.o: src/arch/x86/%.asm | $(OBJDIR)
