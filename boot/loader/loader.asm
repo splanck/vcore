@@ -284,7 +284,7 @@ LMEntry:
     cld
     mov rdi,0x100000
     mov rsi,CModule
-    mov rcx,512*15/8
+    mov rcx,ENTRY_SECTORS*512/8
     rep movsq
 
     mov rax,0xffff800000100000

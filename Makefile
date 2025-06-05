@@ -19,6 +19,7 @@ ASM_OBJS := $(patsubst src/arch/x86/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
 KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
 FS_IMG := fs.img
 LOADER_BIN := boot/loader/loader.bin
+ENTRY_SECTORS := $(shell python3 -c 'import os,math; print(math.ceil(os.path.getsize("boot/loader/entry.bin")/512))')
 
 LIBC_C_SRCS := libc/src/printf.c libc/src/stdlib.c libc/src/string.c \
                libc/src/stdio.c libc/src/ctype.c libc/src/strtol.c \
@@ -82,9 +83,9 @@ boot/loader/entry.bin:
 	$(OBJCOPY) -O binary entry entry.bin
 
 boot/loader/loader.bin: boot/loader/loader.asm boot/loader/entry.bin
-			cd boot/loader && \
-		$(NASM) -f bin -o loader.bin loader.asm && \
-		dd if=entry.bin >> loader.bin
+	cd boot/loader && \
+$(NASM) -f bin -DENTRY_SECTORS=$(ENTRY_SECTORS) -o loader.bin loader.asm && \
+	dd if=entry.bin >> loader.bin
 	
 os.img: boot/boot.bin boot/loader/loader.bin $(FS_IMG)
 	test -f $(FS_IMG)
