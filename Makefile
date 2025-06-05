@@ -17,6 +17,7 @@ $(patsubst src/drivers/net/%.c,$(OBJDIR)/%.o,$(DRIVER_SRCS)) \
 $(patsubst src/net/%.c,$(OBJDIR)/%.o,$(NET_SRCS))
 ASM_OBJS := $(patsubst src/arch/x86/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
 KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
+FS_IMG := fs.img
 
 LIBC_C_SRCS := libc/src/printf.c libc/src/stdlib.c libc/src/string.c \
                libc/src/stdio.c libc/src/ctype.c libc/src/strtol.c \
@@ -82,13 +83,17 @@ boot/loader/loader.bin: boot/loader/loader.asm boot/loader/entry.bin
 		$(NASM) -f bin -o loader.bin loader.asm && \
 		dd if=entry.bin >> loader.bin
 	
-os.img: boot/boot.bin boot/loader/loader.bin
+os.img: boot/boot.bin boot/loader/loader.bin $(FS_IMG)
 	rm -f $@
 	dd if=boot/boot.bin of=$@ bs=512 count=1 conv=notrunc
 	dd if=boot/loader/loader.bin of=$@ bs=512 count=15 seek=1 conv=notrunc
+	dd if=$(FS_IMG) of=$@ bs=512 seek=63 conv=notrunc
 
 # User programs
 users: libc user/ls/ls.elf user/test/test.elf user/totalmem/totalmem.elf user/user1/user.elf user/ping/ping.elf user/cow/cow.elf
+
+$(FS_IMG): kernel.elf users boot/boot.bin
+	python3 scripts/mkfs.py boot/boot.bin $(FS_IMG)
 
 user/ls/ls.elf:
 	cd user/ls && \
@@ -126,7 +131,7 @@ user/cow/cow.elf:
        $(LD) $(LDFLAGS) -T link.lds -o cow.elf start.o main.o ../../libc/libc.a
 
 clean:
-	rm -rf $(OBJDIR) kernel.elf kernel.bin
+	rm -rf $(OBJDIR) kernel.elf kernel.bin $(FS_IMG)
 	rm -f boot/boot.bin boot/loader/*.o boot/loader/entry boot/loader/entry.bin boot/loader/loader.bin os.img
 	rm -f user/*/*.o user/*/*.elf
 
