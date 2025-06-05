@@ -15,14 +15,15 @@ start_aps:
     jle .done
     mov ecx, 1
 .loop:
+    mov rax, LAPIC_BASE
     mov edx, ecx
     shl edx, 24
-    mov dword [LAPIC_BASE + ICR_HIGH], edx
-    mov dword [LAPIC_BASE + ICR_LOW], 0x000C4500        ; INIT
-    mov dword [LAPIC_BASE + ICR_HIGH], edx
-    mov dword [LAPIC_BASE + ICR_LOW], 0x000C4608        ; SIPI
-    mov dword [LAPIC_BASE + ICR_HIGH], edx
-    mov dword [LAPIC_BASE + ICR_LOW], 0x000C4608        ; SIPI again
+    mov dword [rax + ICR_HIGH], edx
+    mov dword [rax + ICR_LOW], 0x000C4500        ; INIT
+    mov dword [rax + ICR_HIGH], edx
+    mov dword [rax + ICR_LOW], 0x000C4608        ; SIPI
+    mov dword [rax + ICR_HIGH], edx
+    mov dword [rax + ICR_LOW], 0x000C4608        ; SIPI again
     mov edi, ecx
     call cpu_mark_online
     inc ecx
@@ -34,10 +35,11 @@ start_aps:
 ; send_ipi(cpu, vector)
 ; rdi=cpu id, sil=vector
 send_ipi:
+    mov rax, LAPIC_BASE
     mov edx, edi
     shl edx, 24
-    mov dword [LAPIC_BASE + ICR_HIGH], edx
-    movzx eax, sil
-    or eax, 0x00004000
-    mov dword [LAPIC_BASE + ICR_LOW], eax
+    mov dword [rax + ICR_HIGH], edx
+    movzx edx, sil
+    or edx, 0x00004000
+    mov dword [rax + ICR_LOW], edx
     ret
