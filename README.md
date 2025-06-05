@@ -50,7 +50,7 @@ You can boot the resulting image with QEMU using the `run` target:
 make run
 ```
 
-This executes `qemu-system-x86_64 -m 1024 -drive format=raw,file=os.img`.
+This executes `qemu-system-x86_64 -m 1024 -drive if=ide,format=raw,file=os.img -boot order=c`.
 
 **Note:** allocate at least 1&nbsp;GB of RAM when running the image.
 

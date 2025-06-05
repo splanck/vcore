@@ -157,7 +157,7 @@ clean:
 	rm -rf $(ISO_DIR) $(ISO_IMG)
 
 run: os.img
-	qemu-system-x86_64 -m 1024 -drive format=raw,file=os.img
+	qemu-system-x86_64 -m 1024 -drive if=ide,format=raw,file=os.img -boot order=c
 
 run-iso: $(ISO_IMG)
 	qemu-system-x86_64 -cdrom $(ISO_IMG)
