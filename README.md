@@ -33,7 +33,8 @@ CROSS=$HOME/opt/cross/bin/x86_64-elf- make
 ## Building
 
 Run `make` at the repository root.  This compiles the kernel, bootloader
-and user programs and produces `os.img`.
+and user programs and produces `os.img`.  The resulting image
+should be roughly 100&nbsp;MB because it embeds a small FAT filesystem.
 
 ```bash
 make
