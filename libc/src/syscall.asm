@@ -350,3 +350,4 @@ get_sched_info:
 
 
 
+section .note.GNU-stack

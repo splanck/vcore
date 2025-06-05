@@ -315,3 +315,4 @@ Gdt64Ptr: dw Gdt64Len-1
 
 CModule:
     
+section .note.GNU-stack

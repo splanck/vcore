@@ -249,3 +249,4 @@ in_byte:
     ret   
 
 
+section .note.GNU-stack

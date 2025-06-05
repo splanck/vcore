@@ -42,3 +42,4 @@ memmove:
     cld
     ret
     
+section .note.GNU-stack

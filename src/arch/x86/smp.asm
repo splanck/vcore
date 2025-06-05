@@ -43,3 +43,4 @@ send_ipi:
     or edx, 0x00004000
     mov dword [rax + ICR_LOW], edx
     ret
+section .note.GNU-stack

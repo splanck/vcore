@@ -18,3 +18,4 @@ End:
     jmp End
 
 
+section .note.GNU-stack
