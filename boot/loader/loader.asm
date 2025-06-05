@@ -102,8 +102,7 @@ LoadFS:
 
 BigRealMode:
     sti
-    xor ax,ax
-    mov fs,ax
+    ; FS already contains 0x10 from the protected-mode setup
     mov ebx,[0x7dc6]        ; filesystem start LBA
     mov eax,[0x7dca]        ; partition size in sectors
     mov ecx,100
