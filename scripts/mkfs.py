@@ -2,20 +2,20 @@
 import os, struct, glob, sys
 
 SECTOR_SIZE = 512
-TOTAL_SECTORS = 2880  # 1.44MB
+TOTAL_SECTORS = 204_800  # ~100MB
 BYTES_PER_SECTOR = SECTOR_SIZE
-SECTORS_PER_CLUSTER = 1
+SECTORS_PER_CLUSTER = 4
 RESERVED_SECTORS = 1
 NUM_FATS = 2
-ROOT_ENTRIES = 224
-SECTORS_PER_FAT = 9
+ROOT_ENTRIES = 512
+SECTORS_PER_FAT = 200
 ROOT_DIR_SECTORS = (ROOT_ENTRIES * 32 + BYTES_PER_SECTOR - 1) // BYTES_PER_SECTOR
 DATA_START_SECTOR = RESERVED_SECTORS + NUM_FATS * SECTORS_PER_FAT + ROOT_DIR_SECTORS
 CLUSTER_SIZE = SECTORS_PER_CLUSTER * BYTES_PER_SECTOR
 IMAGE_SIZE = TOTAL_SECTORS * BYTES_PER_SECTOR
 
-# FAT12 end-of-chain marker
-EOC = 0xFFF
+# FAT16 end-of-chain marker
+EOC = 0xFFFF
 
 # Offsets inside boot sector for partition table
 PART_START_OFFSET = 0x1BE + 8
@@ -23,14 +23,7 @@ PART_SIZE_OFFSET = 0x1BE + 12
 
 
 def set_fat_entry(fat: bytearray, index: int, value: int):
-    # FAT12 uses 12-bit entries
-    offset = (index * 3) // 2
-    if index & 1:
-        fat[offset] = (fat[offset] & 0x0F) | ((value << 4) & 0xF0)
-        fat[offset + 1] = (value >> 4) & 0xFF
-    else:
-        fat[offset] = value & 0xFF
-        fat[offset + 1] = (fat[offset + 1] & 0xF0) | ((value >> 8) & 0x0F)
+    struct.pack_into('<H', fat, index * 2, value & 0xFFFF)
 
 
 def write_files(image: bytearray, fat: bytearray, root_dir: bytearray, files):
@@ -68,25 +61,26 @@ def create_image(img_path: str, boot_bin: str):
     struct.pack_into('<H', boot_sector, 14, RESERVED_SECTORS)
     boot_sector[16] = NUM_FATS
     struct.pack_into('<H', boot_sector, 17, ROOT_ENTRIES)
-    struct.pack_into('<H', boot_sector, 19, TOTAL_SECTORS)
+    struct.pack_into('<H', boot_sector, 19, 0)
     boot_sector[21] = 0xF8
     struct.pack_into('<H', boot_sector, 22, SECTORS_PER_FAT)
     struct.pack_into('<H', boot_sector, 24, 32)
     struct.pack_into('<H', boot_sector, 26, 64)
     struct.pack_into('<I', boot_sector, 28, 0)
-    struct.pack_into('<I', boot_sector, 32, 0)
+    struct.pack_into('<I', boot_sector, 32, TOTAL_SECTORS)
     boot_sector[36] = 0
     boot_sector[37] = 0
     boot_sector[38] = 0x29
     struct.pack_into('<I', boot_sector, 39, 0x12345678)
     boot_sector[43:54] = b'VCORE      '
-    boot_sector[54:62] = b'FAT12   '
+    boot_sector[54:62] = b'FAT16   '
     boot_sector[510] = 0x55
     boot_sector[511] = 0xAA
     image[0:512] = boot_sector
 
     fat = bytearray(SECTORS_PER_FAT * BYTES_PER_SECTOR)
-    fat[0:3] = b'\xf8\xff\xff'
+    struct.pack_into('<H', fat, 0, 0xFFF8)
+    struct.pack_into('<H', fat, 2, 0xFFFF)
     root_dir = bytearray(ROOT_DIR_SECTORS * BYTES_PER_SECTOR)
 
     files = []
