@@ -62,6 +62,9 @@ Cont:
 GetMemDone:
     cmp byte[LoadImage],1
     jne ReadError
+    mov si,E820Msg
+    mov cx,E820MsgLen
+    call PrintString
 
 TestA20:
     mov ax,0xffff
@@ -170,6 +173,9 @@ CopyRemainingData:
     add edi,4
     loop CopyRemainingData
 
+    mov si,ReadMsg
+    mov cx,ReadMsgLen
+    call PrintString
 
     cli
     lidt [Idt32Ptr]
@@ -193,6 +199,22 @@ ReadSectors:
     int 0x13
     
     setc al
+    ret
+
+PrintString:
+    push ax
+    push bx
+    push cx
+    push bp
+    mov ah,0x13
+    mov al,1            ; update cursor
+    mov bx,0x0007       ; page=0, attribute=7
+    mov bp,si           ; DS:SI -> string, CX = length
+    int 0x10
+    pop bp
+    pop cx
+    pop bx
+    pop ax
     ret
 
 ReadError:
@@ -274,6 +296,10 @@ LEnd:
 
 Message:    db "We have an error in boot process"
 MessageLen: equ $-Message
+E820Msg:    db "E820 done"
+E820MsgLen: equ $-E820Msg
+ReadMsg:    db "Read done"
+ReadMsgLen: equ $-ReadMsg
 
 ReadPacket: times 16 db 0
 DriveId: db 0
