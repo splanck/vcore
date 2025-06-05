@@ -86,6 +86,7 @@ boot/loader/loader.bin: boot/loader/loader.asm boot/loader/entry.bin
 		dd if=entry.bin >> loader.bin
 	
 os.img: boot/boot.bin boot/loader/loader.bin $(FS_IMG)
+	test -f $(FS_IMG)
 	rm -f $@
 	dd if=boot/boot.bin of=$@ bs=512 count=1 conv=notrunc
 	dd if=boot/loader/loader.bin of=$@ bs=512 count=$(LOADER_SECTORS) seek=1 conv=notrunc
