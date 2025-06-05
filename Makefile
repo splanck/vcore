@@ -168,7 +168,9 @@ $(ISO_DIR)/boot/grub/grub.cfg: grub/grub.cfg
 
 
 $(ISO_IMG): $(ISO_DIR)/boot/grub/grub.cfg kernel users
+	command -v grub-mkrescue >/dev/null || \
+	    { echo 'Error: grub-mkrescue not found.' >&2; exit 1; }
 	cp kernel.elf $(ISO_DIR)
 	cp user/*/*.elf $(ISO_DIR)
-	grub-mkrescue -o $(ISO_IMG) $(ISO_DIR) >/dev/null
+	grub-mkrescue -o $@ $(ISO_DIR) >/dev/null
 	
