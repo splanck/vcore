@@ -58,6 +58,8 @@ boot/loader/*.bin
 boot/loader/entry
 fs.img
 os.img
+os.iso
+isodir/
 user/*/*.bin
 
 # Intermediate build files
