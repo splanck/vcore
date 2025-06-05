@@ -1,5 +1,8 @@
 [BITS 16]
 [ORG 0x7c00]
+%ifndef LOADER_SECTORS
+%define LOADER_SECTORS 15
+%endif
 
 start:
     xor ax,ax   
@@ -20,7 +23,7 @@ TestDiskExtension:
 LoadLoader:
     mov si,ReadPacket
     mov word[si],0x10
-    mov word[si+2],15
+    mov word[si+2],LOADER_SECTORS
     mov word[si+4],0x7e00
     mov word[si+6],0
     mov dword[si+8],1
