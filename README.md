@@ -36,7 +36,7 @@ Run `make` at the repository root.  This compiles the kernel, bootloader
 and user programs and produces `os.img`.  If `grub-mkrescue` is
 available an additional ISO image `os.iso` is created.  The ISO build
 relies on the `grub-mkrescue` tool (install the `grub-pc-bin` package on Debian-based systems).  The resulting image should be
-roughly 100&nbsp;MB because it embeds a small FAT filesystem.
+around 105&nbsp;MB because it embeds a small FAT filesystem.
 
 ```bash
 make
