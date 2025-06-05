@@ -43,4 +43,4 @@ send_ipi:
     or edx, 0x00004000
     mov dword [rax + ICR_LOW], edx
     ret
-section .note.GNU-stack
+section .note.GNU-stack noalloc noexec nowrite progbits

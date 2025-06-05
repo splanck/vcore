@@ -70,4 +70,4 @@ times (0x1be-($-$$)) db 0
     db 0xaa
 
 	
-section .note.GNU-stack
+section .note.GNU-stack noalloc noexec nowrite progbits
