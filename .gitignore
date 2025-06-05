@@ -54,6 +54,10 @@ dkms.conf
 kernel
 kernel.bin
 boot/*.bin
+boot/loader/*.bin
+boot/loader/entry
+fs.img
+os.img
 user/*/*.bin
 
 # Intermediate build files
