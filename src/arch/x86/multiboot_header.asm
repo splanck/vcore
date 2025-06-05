@@ -18,3 +18,4 @@ multiboot_header_start:
     dw 0
     dd 8
 multiboot_header_end:
+section .note.GNU-stack noalloc noexec nowrite progbits

@@ -7,4 +7,4 @@ start:
     call main
     call exitu
     jmp $
-section .note.GNU-stack
+section .note.GNU-stack noalloc noexec nowrite progbits
