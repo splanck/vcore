@@ -19,10 +19,12 @@ ASM_OBJS := $(patsubst src/arch/x86/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
 KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
 FS_IMG := fs.img
 LOADER_BIN := boot/loader/loader.bin
+ISO_DIR ?= isodir
+ISO_IMG ?= os.iso
 
 LIBC_C_SRCS := libc/src/printf.c libc/src/stdlib.c libc/src/string.c \
-               libc/src/stdio.c libc/src/ctype.c libc/src/strtol.c \
-               libc/src/errno.c
+	       libc/src/stdio.c libc/src/ctype.c libc/src/strtol.c \
+	       libc/src/errno.c
 LIBC_ASM_SRCS := $(wildcard libc/src/*.asm)
 LIBC_C_OBJS := $(patsubst libc/src/%.c,$(OBJDIR)/libc_%.o,$(LIBC_C_SRCS))
 LIBC_ASM_OBJS := $(patsubst libc/src/%.asm,$(OBJDIR)/libc_%.o,$(LIBC_ASM_SRCS))
@@ -32,7 +34,7 @@ LIBC_ARCHIVE := libc/libc.a
 $(OBJDIR):
 	mkdir -p $@
 
-.PHONY: all libc kernel bootloader users clean run
+.PHONY: all libc kernel bootloader users clean run iso
 
 all: libc kernel bootloader users
 
@@ -67,7 +69,7 @@ bootloader: os.img
 
 boot/boot.bin: boot/boot.asm $(LOADER_BIN)
 	LOADER_SECTORS=`python3 -c 'import os,math; \
-         print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))'`; \
+	 print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))'`; \
 $(NASM) -f bin -DLOADER_SECTORS=$$LOADER_SECTORS -o $@ $<
 	
 boot/loader/entry.bin:
@@ -94,7 +96,7 @@ os.img: boot/boot.bin boot/loader/loader.bin $(FS_IMG)
 	rm -f $@
 	dd if=boot/boot.bin of=$@ bs=512 count=1 conv=notrunc
 	LOADER_SECTORS=`python3 -c 'import os,math; \
-         print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))'`; \
+	 print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))'`; \
 	dd if=boot/loader/loader.bin of=$@ bs=512 \
 	count=$$LOADER_SECTORS seek=1 conv=notrunc
 	dd if=$(FS_IMG) of=$@ bs=512 seek=63 conv=notrunc
@@ -144,7 +146,21 @@ clean:
 	rm -rf $(OBJDIR) kernel.elf kernel.bin $(FS_IMG)
 	rm -f boot/boot.bin boot/loader/*.o boot/loader/entry boot/loader/entry.bin boot/loader/loader.bin os.img
 	rm -f user/*/*.o user/*/*.elf
+	rm -rf $(ISO_DIR) $(ISO_IMG)
 
 run: os.img
 	qemu-system-x86_64 -m 1024 -drive format=raw,file=os.img
 
+iso: $(ISO_IMG)
+
+
+$(ISO_DIR)/boot/grub/grub.cfg: grub/grub.cfg
+	mkdir -p $(ISO_DIR)/boot/grub
+	cp grub/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
+
+
+$(ISO_IMG): $(ISO_DIR)/boot/grub/grub.cfg kernel users
+	cp kernel.elf $(ISO_DIR)
+	cp user/*/*.elf $(ISO_DIR)
+	grub-mkrescue -o $(ISO_IMG) $(ISO_DIR) >/dev/null
+	

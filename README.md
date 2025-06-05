@@ -52,6 +52,20 @@ This executes `qemu-system-x86_64 -m 1024 -drive format=raw,file=os.img`.
 
 **Note:** allocate at least 1&nbsp;GB of RAM when running the image.
 
+Alternatively an ISO image can be built using GRUB.  Run
+
+```bash
+make iso
+```
+
+which produces `os.iso`.  Boot it with
+
+```bash
+qemu-system-x86_64 -cdrom os.iso
+```
+
+The original bootloader based image `os.img` continues to work.
+
 ## Networking
 
 The kernel contains a very small driver for the Intel E1000 network
