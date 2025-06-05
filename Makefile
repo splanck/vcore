@@ -136,5 +136,5 @@ clean:
 	rm -f user/*/*.o user/*/*.elf
 
 run: os.img
-	qemu-system-x86_64 -drive format=raw,file=os.img
+	qemu-system-x86_64 -m 1024 -drive format=raw,file=os.img
 
