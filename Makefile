@@ -105,6 +105,9 @@ os.img: boot/boot.bin boot/loader/loader.bin $(FS_IMG)
 	dd if=boot/loader/loader.bin of=$@ bs=512 \
 	count=$$LOADER_SECTORS seek=1 conv=notrunc
 	dd if=$(FS_IMG) of=$@ bs=512 seek=63 conv=notrunc
+	@actual=$$(stat -c '%s' $@); \
+	[ $$actual -ge 100000000 ] || \
+	    { echo 'Error: os.img too small; filesystem missing?' >&2; exit 1; }
 
 # User programs
 users: libc user/ls/ls.elf user/test/test.elf user/totalmem/totalmem.elf user/user1/user.elf user/ping/ping.elf user/cow/cow.elf
