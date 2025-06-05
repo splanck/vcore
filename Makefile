@@ -66,9 +66,9 @@ $(LIBC_ARCHIVE): $(LIBC_OBJS)
 bootloader: os.img
 
 boot/boot.bin: boot/boot.asm $(LOADER_BIN)
-	$(NASM) -f bin \
-	    -DLOADER_SECTORS=$(shell python3 -c 'import os,math; print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))') \
-	    -o $@ $<
+	LOADER_SECTORS=`python3 -c 'import os,math; \
+         print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))'`; \
+$(NASM) -f bin -DLOADER_SECTORS=$$LOADER_SECTORS -o $@ $<
 	
 boot/loader/entry.bin:
 	cd boot/loader && \
@@ -93,9 +93,10 @@ os.img: boot/boot.bin boot/loader/loader.bin $(FS_IMG)
 	test -f $(FS_IMG)
 	rm -f $@
 	dd if=boot/boot.bin of=$@ bs=512 count=1 conv=notrunc
+	LOADER_SECTORS=`python3 -c 'import os,math; \
+         print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))'`; \
 	dd if=boot/loader/loader.bin of=$@ bs=512 \
-	count=$(shell python3 -c 'import os,math; print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))') \
-	seek=1 conv=notrunc
+	count=$$LOADER_SECTORS seek=1 conv=notrunc
 	dd if=$(FS_IMG) of=$@ bs=512 seek=63 conv=notrunc
 
 # User programs
