@@ -33,8 +33,10 @@ CROSS=$HOME/opt/cross/bin/x86_64-elf- make
 ## Building
 
 Run `make` at the repository root.  This compiles the kernel, bootloader
-and user programs and produces `os.img`.  The resulting image
-should be roughly 100&nbsp;MB because it embeds a small FAT filesystem.
+and user programs and produces `os.img`.  If `grub-mkrescue` is
+available an additional ISO image `os.iso` is created.  The ISO build
+relies on the `grub-mkrescue` tool.  The resulting image should be
+roughly 100&nbsp;MB because it embeds a small FAT filesystem.
 
 ```bash
 make
@@ -57,8 +59,15 @@ Alternatively an ISO image can be built using GRUB.  Run
 ```bash
 make iso
 ```
+(requires the `grub-mkrescue` tool)
 
-which produces `os.iso`.  Boot it with
+which produces `os.iso`.  Boot it with the `run-iso` target:
+
+```bash
+make run-iso
+```
+
+or run
 
 ```bash
 qemu-system-x86_64 -cdrom os.iso

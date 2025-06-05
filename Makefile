@@ -34,9 +34,14 @@ LIBC_ARCHIVE := libc/libc.a
 $(OBJDIR):
 	mkdir -p $@
 
-.PHONY: all libc kernel bootloader users clean run iso
+.PHONY: all libc kernel bootloader users clean run run-iso iso
 
-all: libc kernel bootloader users
+HAVE_GRUB_MKRESCUE := $(shell command -v grub-mkrescue >/dev/null 2>&1 && echo yes)
+ifeq ($(HAVE_GRUB_MKRESCUE),yes)
+ALL_EXTRA := $(ISO_IMG)
+endif
+
+all: libc kernel bootloader users $(ALL_EXTRA)
 
 libc: $(LIBC_ARCHIVE)
 
@@ -150,6 +155,9 @@ clean:
 
 run: os.img
 	qemu-system-x86_64 -m 1024 -drive format=raw,file=os.img
+
+run-iso: $(ISO_IMG)
+	qemu-system-x86_64 -cdrom $(ISO_IMG)
 
 iso: $(ISO_IMG)
 
