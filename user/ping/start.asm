@@ -7,3 +7,4 @@ start:
     call main
     call exitu
     jmp $
+section .note.GNU-stack
