@@ -42,11 +42,12 @@ int ipv4_send(uint32_t dst_ip, uint8_t proto, const uint8_t *data, uint16_t len)
     ip->src_ip = host_ip;
     ip->dst_ip = dst_ip;
 
-    /* Compute IPv4 header checksum */
-    uint16_t *w = (uint16_t*)ip;
+    /* Compute IPv4 header checksum using aligned reads */
+    uint16_t hdr[10];
+    memcpy(hdr, ip, sizeof(hdr));
     uint32_t sum = 0;
     for (int i = 0; i < 10; i++)
-        sum += w[i];
+        sum += hdr[i];
     while (sum >> 16)
         sum = (sum & 0xFFFF) + (sum >> 16);
     ip->checksum = ~sum;
