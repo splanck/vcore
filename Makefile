@@ -19,7 +19,6 @@ ASM_OBJS := $(patsubst src/arch/x86/%.asm,$(OBJDIR)/%_asm.o,$(ASM_SRCS))
 KERNEL_OBJS := $(ASM_OBJS) $(C_OBJS)
 FS_IMG := fs.img
 LOADER_BIN := boot/loader/loader.bin
-LOADER_SECTORS = $(shell python3 -c "import os,math; size=os.path.getsize('$(LOADER_BIN)') if os.path.exists('$(LOADER_BIN)') else 0; print((size+511)//512)")
 
 LIBC_C_SRCS := libc/src/printf.c libc/src/stdlib.c libc/src/string.c \
                libc/src/stdio.c libc/src/ctype.c libc/src/strtol.c \
@@ -67,7 +66,9 @@ $(LIBC_ARCHIVE): $(LIBC_OBJS)
 bootloader: os.img
 
 boot/boot.bin: boot/boot.asm $(LOADER_BIN)
-	$(NASM) -f bin -DLOADER_SECTORS=$(LOADER_SECTORS) -o $@ $<
+	$(NASM) -f bin \
+	    -DLOADER_SECTORS=$(shell python3 -c 'import os,math; print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))') \
+	    -o $@ $<
 	
 boot/loader/entry.bin:
 	cd boot/loader && \
@@ -89,7 +90,9 @@ os.img: boot/boot.bin boot/loader/loader.bin $(FS_IMG)
 	test -f $(FS_IMG)
 	rm -f $@
 	dd if=boot/boot.bin of=$@ bs=512 count=1 conv=notrunc
-	dd if=boot/loader/loader.bin of=$@ bs=512 count=$(LOADER_SECTORS) seek=1 conv=notrunc
+	dd if=boot/loader/loader.bin of=$@ bs=512 \
+	count=$(shell python3 -c 'import os,math; print(math.ceil(os.path.getsize("$(LOADER_BIN)")/512))') \
+	seek=1 conv=notrunc
 	dd if=$(FS_IMG) of=$@ bs=512 seek=63 conv=notrunc
 
 # User programs
