@@ -33,10 +33,11 @@ CROSS=$HOME/opt/cross/bin/x86_64-elf- make
 ## Building
 
 Run `make` at the repository root.  This compiles the kernel, bootloader
-and user programs and produces `os.img`.  If `grub-mkrescue` is
-available an additional ISO image `os.iso` is created.  The ISO build
-relies on the `grub-mkrescue` tool (install the `grub-pc-bin` package on Debian-based systems).  The resulting image should be
-around 105&nbsp;MB because it embeds a small FAT filesystem.
+and user programs and produces `os.img`.  The resulting `os.img` is
+around 105&nbsp;MB because it embeds a small FAT filesystem.  If
+`grub-mkrescue` is available an additional ISO image `os.iso` is created.
+The ISO build relies on the `grub-mkrescue` tool (install the
+`grub-pc-bin` package on Debian-based systems).
 
 ```bash
 make
