@@ -104,15 +104,13 @@ BigRealMode:
     sti
     xor ax,ax
     mov fs,ax
-    mov eax,[0x7dca]
-    mov edx,[0x7dc6]
-    add eax,edx
+    mov ebx,[0x7dc6]        ; filesystem start LBA
+    mov eax,[0x7dca]        ; partition size in sectors
     mov ecx,100
     xor edx,edx
-    div ecx
-    mov cx,ax
-    mov si,dx
-    xor ebx,ebx
+    div ecx                ; eax / 100 -> ax: quotient, dx: remainder
+    mov cx,ax              ; number of full 100-sector reads
+    mov si,dx              ; remaining sectors
     mov edi,0x30000000
 
 ReadFAT:
