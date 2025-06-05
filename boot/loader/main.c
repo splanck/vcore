@@ -53,7 +53,12 @@ static uint64_t load_kernel(char *name)
 
 void EMain(void)
 {
-   init_fs();
-   kernel_entry = load_kernel("KERNEL.ELF");
-   ASSERT(load_file("USER.ELF", 0x30000) == 0);
+    printk("loader: init_fs\n");
+    init_fs();
+
+    printk("loader: load_kernel\n");
+    kernel_entry = load_kernel("KERNEL.ELF");
+
+    printk("loader: load_file\n");
+    ASSERT(load_file("USER.ELF", 0x30000) == 0);
 }
