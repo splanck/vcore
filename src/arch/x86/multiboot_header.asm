@@ -1,5 +1,5 @@
 section .multiboot
-extern start
+extern start32
 align 8
 multiboot_header_start:
     dd 0xe85250d6             ; magic
@@ -11,7 +11,7 @@ multiboot_header_start:
     dw 3                       ; type
     dw 0                       ; flags
     dd 16                      ; size of this tag
-    dq start                   ; kernel entry point
+    dq start32                 ; kernel entry point
 
     ; End tag
     dw 0

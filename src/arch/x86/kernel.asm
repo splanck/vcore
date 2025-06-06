@@ -17,6 +17,7 @@ TssDesc:
 
 Gdt64Len: equ $-Gdt64
 
+global Gdt64Ptr
 Gdt64Ptr: dw Gdt64Len-1
           dq Gdt64
 
@@ -30,9 +31,9 @@ TssLen: equ $-Tss
 
 section .text
 extern KMain
-global start
+global start64
 
-start:
+start64:
     mov rax,Gdt64Ptr
     lgdt [rax]
 
