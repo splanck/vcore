@@ -11,7 +11,7 @@ LDFLAGS = -nostdlib
 C_SRCS := $(wildcard src/kernel/*.c)
 DRIVER_SRCS := $(wildcard src/drivers/net/*.c)
 NET_SRCS := $(wildcard src/net/*.c)
-ASM_SRCS := $(wildcard src/arch/x86/*.asm)
+ASM_SRCS := $(sort $(wildcard src/arch/x86/*.asm) src/arch/x86/start32.asm)
 C_OBJS := $(patsubst src/kernel/%.c,$(OBJDIR)/%.o,$(C_SRCS)) \
 $(patsubst src/drivers/net/%.c,$(OBJDIR)/%.o,$(DRIVER_SRCS)) \
 $(patsubst src/net/%.c,$(OBJDIR)/%.o,$(NET_SRCS))
