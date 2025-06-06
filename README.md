@@ -62,7 +62,10 @@ make iso
 ```
 (requires the `grub-mkrescue` tool)
 
-which produces `os.iso`.  Boot it with the `run-iso` target:
+GRUB support relies on a 32-bit start stub that collects the
+Multiboot memory map before jumping to the 64-bit kernel.
+
+This produces `os.iso`.  Boot it with the `run-iso` target:
 
 ```bash
 make run-iso
