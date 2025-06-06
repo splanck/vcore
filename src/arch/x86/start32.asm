@@ -11,6 +11,57 @@ extern Gdt64Ptr
 
 start:
 start32:
+    ; check for Multiboot2 magic (eax == 0x36d76289)
+    cmp eax,0x36d76289
+    jne .no_multiboot
+
+    mov esi,ebx            ; ebx -> multiboot2 information structure
+    add esi,8              ; skip total_size and reserved fields
+
+.parse_tag:
+    mov edx,[esi]          ; tag type
+    mov ecx,[esi+4]        ; tag size
+    cmp edx,0              ; end tag ?
+    je .done_multiboot
+    cmp edx,6              ; type 6 -> memory map
+    jne .next_tag
+
+    ; parse memory map
+    mov ebx,[esi+8]        ; entry_size
+    mov eax,ecx
+    sub eax,16
+    xor edx,edx
+    div ebx                ; eax = entry count
+    mov [0x20000],eax      ; store count
+
+    mov edi,0x20008        ; destination for entries
+    mov ebp,eax            ; loop counter
+    lea esi,[esi+16]       ; first entry
+.copy_loop:
+    mov eax,[esi]
+    mov [edi],eax
+    mov eax,[esi+4]
+    mov [edi+4],eax
+    mov eax,[esi+8]
+    mov [edi+8],eax
+    mov eax,[esi+12]
+    mov [edi+12],eax
+    mov eax,[esi+16]
+    mov [edi+16],eax
+    add esi,ebx
+    add edi,20
+    dec ebp
+    jnz .copy_loop
+    jmp .done_multiboot
+
+.next_tag:
+    add ecx,7              ; align to 8 bytes
+    and ecx,0xfffffff8
+    add esi,ecx
+    jmp .parse_tag
+
+.done_multiboot:
+.no_multiboot:
     ; zero page table area
     mov edi,0x70000
     xor eax,eax
